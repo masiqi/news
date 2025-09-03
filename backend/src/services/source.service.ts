@@ -3,6 +3,7 @@ import { drizzle } from 'drizzle-orm/d1';
 import { sources, users } from '../db/schema';
 import { eq, and, or } from 'drizzle-orm';
 import type { Source, NewSource } from '../db/types';
+import type { User, NewUser } from '../db/types';
 
 export class SourceService {
   constructor(private db: any) {}
@@ -123,7 +124,7 @@ export class SourceService {
    * 创建系统用户（ID=1）用于提供公共源
    * @returns 系统用户
    */
-  async createSystemUser(): Promise<any> {
+  async createSystemUser(): Promise<User> {
     // 检查系统用户是否已存在
     const existingUser = await this.db.select().from(users).where(eq(users.id, 1)).limit(1);
     if (existingUser.length > 0) {
@@ -131,7 +132,7 @@ export class SourceService {
     }
 
     // 创建系统用户
-    const systemUser = {
+    const systemUser: NewUser = {
       id: 1,
       email: 'system@rss-platform.com',
       passwordHash: '', // 系统用户不需要密码
