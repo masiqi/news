@@ -49,9 +49,6 @@ authRoutes.post("/register", async (c) => {
 
     // 加密密码
     const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
-
-    // 初始化数据库连接
-    const db = initDB(c.env.DB);
     
     // 创建新用户
     const newUser = await db.insert(users).values({
