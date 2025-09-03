@@ -8,6 +8,7 @@
 	},
 	"dependencies": {
 		"@cloudflare/d1": "^1.4.1",
+		"bcrypt": "^6.0.0",
 		"drizzle-orm": "^0.44.5",
 		"hono": "^4.9.5"
 	},

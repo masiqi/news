@@ -1,5 +1,5 @@
 # Dependencies
-node_modules/
+**/node_modules/
 .yarn/
 .pnp
 .pnp.*
@@ -41,3 +41,11 @@ pnpm-lock.yaml
 # Misc
 *.tgz
 *.zip
+
+# Editor
+*.swp
+*.swo
+
+# Temp files
+.tmp/
+temp/
