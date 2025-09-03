@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import NavigationMenu from '@/components/NavigationMenu';
 
 export default function DashboardPage() {
   const [user, setUser] = useState<any>(null);
@@ -24,9 +25,8 @@ export default function DashboardPage() {
           return;
         }
 
-        // 验证令牌有效性
+        // 验证令牌有效性（简化处理）
         // 实际应用中应该调用后端API验证令牌
-        // 这里简化处理，仅检查令牌存在性
         setUser({ email: 'user@example.com' }); // 示例用户数据
       } catch (error) {
         console.error('检查登录状态失败:', error);
@@ -39,48 +39,6 @@ export default function DashboardPage() {
     checkLoginStatus();
   }, [router]);
 
-  const handleLogout = async () => {
-    try {
-      // 获取JWT令牌
-      const token = document.cookie
-        .split('; ')
-        .find(row => row.startsWith('token='))
-        ?.split('=')[1];
-
-      if (!token) {
-        // 如果没有令牌，直接跳转到登录页面
-        router.push('/login');
-        return;
-      }
-
-      // 调用后端登出API
-      const response = await fetch('/api/auth/logout', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ token }),
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        // 登出成功，跳转到登录页面
-        router.push('/login?loggedOut=true');
-      } else {
-        // 登出失败，显示错误信息
-        console.error('登出失败:', data.error);
-        // 仍然跳转到登录页面
-        router.push('/login?loggedOut=true');
-      }
-    } catch (error) {
-      console.error('登出API错误:', error);
-      // 即使API调用失败，也清除本地令牌并跳转到登录页面
-      document.cookie = 'token=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/';
-      router.push('/login?loggedOut=true');
-    }
-  };
-
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -91,24 +49,51 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <header className="bg-white shadow">
-        <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8 flex justify-between items-center">
-          <h1 className="text-3xl font-bold text-gray-900">仪表板</h1>
-          <button
-            onClick={handleLogout}
-            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-          >
-            登出
-          </button>
-        </div>
-      </header>
-      <main>
-        <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-          <div className="px-4 py-6 sm:px-0">
-            <div className="border-4 border-dashed border-gray-200 rounded-lg h-96 p-4">
-              <h2 className="text-xl font-semibold mb-4">欢迎来到您的仪表板</h2>
-              <p>您已成功登录系统。</p>
-              {user && <p>当前用户: {user.email}</p>}
+      {/* 导航栏 */}
+      <NavigationMenu />
+      
+      {/* 主要内容 */}
+      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+        <div className="px-4 py-6 sm:px-0">
+          <div className="border-4 border-dashed border-gray-200 rounded-lg h-96 p-4">
+            <h2 className="text-xl font-semibold mb-4">欢迎来到您的仪表板</h2>
+            <p>您已成功登录系统。</p>
+            {user && <p>当前用户: {user.email}</p>}
+            
+            <div className="mt-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div className="bg-white rounded-lg shadow p-6">
+                <h3 className="text-lg font-medium text-gray-900 mb-2">我的RSS源</h3>
+                <p className="text-gray-600 mb-4">管理您的个人RSS源</p>
+                <button
+                  onClick={() => router.push('/sources/my')}
+                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                >
+                  查看我的源
+                </button>
+              </div>
+              
+              <div className="bg-white rounded-lg shadow p-6">
+                <h3 className="text-lg font-medium text-gray-900 mb-2">公共RSS源</h3>
+                <p className="text-gray-600 mb-4">浏览和复制公共源</p>
+                <button
+                  onClick={() => router.push('/sources/public')}
+                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                >
+                  浏览公共源
+                </button>
+              </div>
+              
+              <div className="bg-white rounded-lg shadow p-6">
+                <h3 className="text-lg font-medium text-gray-900 mb-2">设置</h3>
+                <p className="text-gray-600 mb-4">管理您的账户设置</p>
+                <button
+                  onClick={() => router.push('/settings')}
+                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                  disabled
+                >
+                  账户设置
+                </button>
+              </div>
             </div>
           </div>
         </div>

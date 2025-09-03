@@ -3,6 +3,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import NavigationMenu from '@/components/NavigationMenu';
 
 interface Source {
   id: number;
@@ -106,25 +107,9 @@ export default function MySourcesPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <header className="bg-white shadow">
-        <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8 flex justify-between items-center">
-          <h1 className="text-3xl font-bold text-gray-900">我的RSS源</h1>
-          <div className="space-x-2">
-            <button
-              onClick={() => router.push('/sources/public')}
-              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-            >
-              公共源
-            </button>
-            <button
-              onClick={() => setShowForm(!showForm)}
-              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
-            >
-              {showForm ? '取消' : '添加源'}
-            </button>
-          </div>
-        </div>
-      </header>
+      {/* 导航栏 */}
+      <NavigationMenu />
+      
       <main>
         <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
           <div className="px-4 py-6 sm:px-0">
@@ -178,7 +163,14 @@ export default function MySourcesPage() {
                         公开源
                       </label>
                     </div>
-                    <div className="flex justify-end">
+                    <div className="flex justify-end space-x-2">
+                      <button
+                        type="button"
+                        onClick={() => setShowForm(false)}
+                        className="inline-flex justify-center py-2 px-4 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                      >
+                        取消
+                      </button>
                       <button
                         type="submit"
                         className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
@@ -192,15 +184,40 @@ export default function MySourcesPage() {
             )}
             
             <div className="border-4 border-dashed border-gray-200 rounded-lg p-4">
-              <h2 className="text-xl font-semibold mb-4">我的RSS源</h2>
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-semibold">我的RSS源</h2>
+                <div className="space-x-2">
+                  <button
+                    onClick={() => router.push('/sources/public')}
+                    className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                  >
+                    公共源
+                  </button>
+                  <button
+                    onClick={() => setShowForm(!showForm)}
+                    className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                  >
+                    {showForm ? '取消' : '添加源'}
+                  </button>
+                </div>
+              </div>
+              
               {sources.length === 0 ? (
-                <p>暂无RSS源</p>
+                <div className="text-center py-8">
+                  <p className="text-gray-500 mb-4">暂无RSS源</p>
+                  <button
+                    onClick={() => setShowForm(true)}
+                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                  >
+                    添加第一个RSS源
+                  </button>
+                </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {sources.map((source) => (
                     <div key={source.id} className="border border-gray-200 rounded-lg p-4">
                       <h3 className="text-lg font-medium text-gray-900">{source.name}</h3>
-                      <p className="text-sm text-gray-500 mt-1">{source.url}</p>
+                      <p className="text-sm text-gray-500 mt-1 truncate">{source.url}</p>
                       <div className="mt-4 flex justify-between items-center">
                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                           source.isPublic 
