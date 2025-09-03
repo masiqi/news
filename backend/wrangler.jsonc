@@ -19,9 +19,13 @@
 		{
 			"binding": "DB",
 			"database_name": "news_platform",
-			"database_id": "news_platform_db"
+			"database_id": "news_platform_db",
+			"migrations_dir": "src/db/migrations"
 		}
-	]
+	],
+	"vars": {
+		"JWT_SECRET": "development_jwt_secret_key_for_local_testing_only"
+	}
 	/**
 	 * Smart Placement
 	 * Docs: https://developers.cloudflare.com/workers/configuration/smart-placement/#smart-placement

@@ -166,7 +166,17 @@ python -m http.server 8000
 - `JWT_SECRET`: JWT签名密钥
 - `DB`: D1数据库绑定
 
-在开发环境中，这些变量可以在 `wrangler.jsonc` 中配置或通过命令行传递。
+在开发环境中，这些变量可以在 `wrangler.jsonc` 中配置。例如：
+
+```json
+{
+  "vars": {
+    "JWT_SECRET": "your_jwt_secret_here"
+  }
+}
+```
+
+注意：在生产环境中，应使用Cloudflare Secrets来存储敏感信息，而不是在配置文件中明文存储。
 
 ### 前端环境变量
 
