@@ -44,6 +44,42 @@ export class ContentCacheService {
   }
 
   /**
+   * 标记条目处理失败
+   * @param entryId 条目ID
+   * @param errorMessage 错误信息
+   * @returns 更新后的条目
+   */
+  async markEntryAsFailed(entryId: number, errorMessage: string): Promise<RssEntry | null> {
+    const result = await this.db.update(rssEntries)
+      .set({ 
+        processed: false, 
+        processedAt: new Date(),
+        // 注意：我们需要在schema中添加错误信息字段
+      })
+      .where(eq(rssEntries.id, entryId))
+      .returning();
+    return result.length > 0 ? result[0] : null;
+  }
+
+  /**
+   * 增加条目处理失败次数
+   * @param entryId 条目ID
+   * @returns 更新后的条目
+   */
+  async incrementFailureCount(entryId: number): Promise<RssEntry | null> {
+    const entry = await this.db.select().from(rssEntries).where(eq(rssEntries.id, entryId)).limit(1);
+    if (entry.length === 0) return null;
+    
+    const failureCount = (entry[0].failureCount || 0) + 1;
+    
+    const result = await this.db.update(rssEntries)
+      .set({ failureCount })
+      .where(eq(rssEntries.id, entryId))
+      .returning();
+    return result.length > 0 ? result[0] : null;
+  }
+
+  /**
    * 获取已处理的内容
    * @param entryId 条目ID
    * @returns 已处理的内容或null

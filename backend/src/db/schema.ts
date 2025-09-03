@@ -31,6 +31,8 @@ export const rssEntries = sqliteTable('rss_entries', {
   publishedAt: integer('published_at', { mode: 'timestamp' }).notNull(), // 发布时间
   processed: integer('processed', { mode: 'boolean' }).default(false).notNull(), // 是否已处理
   processedAt: integer('processed_at', { mode: 'timestamp' }), // 处理时间
+  failureCount: integer('failure_count').default(0).notNull(), // 处理失败次数
+  errorMessage: text('error_message'), // 错误信息
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
 });
 

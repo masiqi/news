@@ -1,7 +1,12 @@
 // src/workers/ai-processor.ts
 import { Context } from '@cloudflare/workers-types';
 import { drizzle } from 'drizzle-orm/d1';
+import { rssEntries } from '../db/schema';
+import { eq } from 'drizzle-orm';
 import { ContentCacheService } from '../services/content-cache.service';
+
+// 最大失败重试次数
+const MAX_FAILURE_RETRIES = 3;
 
 interface Env {
   DB: D1Database;
@@ -21,6 +26,18 @@ export default {
     for (const message of batch.messages) {
       try {
         const { entryId, sourceId, content } = message.body;
+        
+        // 检查条目失败次数
+        const entry = await db.select().from(rssEntries).where(eq(rssEntries.id, entryId)).get();
+        if (!entry) {
+          console.error(`条目 ${entryId} 不存在`);
+          continue;
+        }
+        
+        if (entry.failureCount >= MAX_FAILURE_RETRIES) {
+          console.error(`条目 ${entryId} 失败次数超过最大重试次数，跳过处理`);
+          continue;
+        }
         
         // 使用Cloudflare Workers AI处理内容
         const startTime = Date.now();
@@ -83,7 +100,16 @@ export default {
         console.log(`内容处理完成，条目ID: ${entryId}, 处理时间: ${processingTime}ms`);
       } catch (error) {
         console.error('AI处理内容时出错:', error);
-        // 可以选择重新排队失败的消息
+        
+        // 增加失败次数
+        try {
+          await contentCacheService.incrementFailureCount(message.body.entryId);
+          console.log(`条目 ${message.body.entryId} 失败次数已增加`);
+        } catch (incrementError) {
+          console.error('增加失败次数时出错:', incrementError);
+        }
+        
+        // 可以选择重新排队失败的消息（如果失败次数未达到最大值）
       }
     }
   },

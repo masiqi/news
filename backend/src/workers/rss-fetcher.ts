@@ -6,6 +6,9 @@ import { eq } from 'drizzle-orm';
 import { ContentCacheService } from '../services/content-cache.service';
 import { SourceService } from '../services/source.service';
 
+// 最大失败重试次数
+const MAX_FAILURE_RETRIES = 3;
+
 interface Env {
   DB: D1Database;
   AI_PROCESSOR_QUEUE: Queue<any>;
@@ -56,6 +59,12 @@ export default {
             }
           );
 
+          // 检查失败次数
+          if (rssEntry.failureCount >= MAX_FAILURE_RETRIES) {
+            console.error(`条目 ${rssEntry.id} 失败次数超过最大重试次数，跳过处理`);
+            continue;
+          }
+
           // 如果条目尚未处理，发送到AI处理队列
           if (!wasAlreadyProcessed) {
             await env.AI_PROCESSOR_QUEUE.send({
@@ -68,6 +77,7 @@ export default {
       } catch (error) {
         console.error('处理RSS源时出错:', error);
         // 可以选择重新排队失败的消息
+        // 注意：在实际应用中，我们需要更智能的重试机制
       }
     }
   },
