@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { eq } from "drizzle-orm";
 import { users } from "../db/schema";
-import { db } from "../db";
+import { initDB } from "../db";
 import bcrypt from "bcrypt";
 import { R2Service } from "../services/r2.service";
 import jwt from "jsonwebtoken";
@@ -38,6 +38,9 @@ authRoutes.post("/register", async (c) => {
       return c.json({ error: "密码必须包含字母和数字" }, 400);
     }
 
+    // 初始化数据库连接
+    const db = initDB(c.env.DB);
+    
     // 检查邮箱是否已被注册
     const existingUser = await db.select().from(users).where(eq(users.email, email)).get();
     if (existingUser) {
@@ -47,6 +50,9 @@ authRoutes.post("/register", async (c) => {
     // 加密密码
     const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
 
+    // 初始化数据库连接
+    const db = initDB(c.env.DB);
+    
     // 创建新用户
     const newUser = await db.insert(users).values({
       email,
@@ -99,6 +105,9 @@ authRoutes.post("/login", async (c) => {
       return c.json({ error: "请输入有效的邮箱地址" }, 400);
     }
 
+    // 初始化数据库连接
+    const db = initDB(c.env.DB);
+    
     // 查找用户
     const user = await db.select().from(users).where(eq(users.email, email)).get();
     if (!user) {
