@@ -13,6 +13,12 @@ if lsof -Pi :$PORT -sTCP:LISTEN -t >/dev/null 2>&1; then
     sleep 2
 fi
 
+# 检查并安装依赖
+if [ ! -d "node_modules" ]; then
+    echo "正在安装后端依赖..."
+    npm install
+fi
+
 # 启动后端服务
 echo "正在启动后端服务..."
 npm run dev

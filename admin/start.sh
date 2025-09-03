@@ -13,6 +13,12 @@ if lsof -Pi :$PORT -sTCP:LISTEN -t >/dev/null 2>&1; then
     sleep 2
 fi
 
+# 检查Python是否可用
+if ! command -v python3 &> /dev/null; then
+    echo "错误: 未找到Python3"
+    exit 1
+fi
+
 # 启动管理后台服务
 echo "正在启动管理后台服务..."
-python -m http.server $PORT
+python3 -m http.server $PORT

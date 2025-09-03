@@ -29,6 +29,27 @@ npm install
 
 这将安装所有工作区的依赖，包括frontend、backend和admin。
 
+### 依赖问题解决
+
+如果遇到依赖冲突或版本不兼容问题：
+
+1. 清理现有依赖：
+   ```bash
+   rm -rf node_modules package-lock.json
+   cd frontend && rm -rf node_modules package-lock.json && cd ..
+   cd backend && rm -rf node_modules package-lock.json && cd ..
+   cd admin && rm -rf node_modules package-lock.json && cd ..
+   ```
+
+2. 重新安装依赖：
+   ```bash
+   npm install
+   ```
+
+### React版本问题
+
+如果遇到React版本不兼容问题，启动脚本会自动检查并处理依赖安装。
+
 ## 启动服务
 
 ### 1. 启动所有服务（推荐）

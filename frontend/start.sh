@@ -27,6 +27,12 @@ if [[ $NODE_VERSION == v24* ]]; then
     echo ""
 fi
 
+# 检查并安装依赖
+if [ ! -d "node_modules" ]; then
+    echo "正在安装前端依赖..."
+    npm install
+fi
+
 # 启动前端服务
 echo "正在启动前端服务..."
 npm run dev
