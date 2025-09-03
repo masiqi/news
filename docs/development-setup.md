@@ -62,13 +62,34 @@ cd backend
 npm run dev
 ```
 
-后端API服务将在 http://localhost:8787 上运行。
+这将使用Wrangler启动后端服务，后端API服务将在 http://localhost:8787 上运行。
 
-使用Wrangler启动后端服务的优势：
-- 提供与生产环境一致的开发环境
-- 支持Cloudflare Workers的所有特性
-- 提供本地模拟的D1数据库
-- 支持实时重载和调试
+**为什么推荐使用Wrangler启动后端服务：**
+1. **生产环境一致性**：Wrangler提供与生产环境几乎完全一致的开发环境，确保开发时的行为与部署后一致。
+
+2. **完整的Cloudflare特性支持**：
+   - 本地模拟D1数据库
+   - 模拟R2对象存储
+   - 模拟Queues消息队列
+   - 模拟Workers AI
+   - 环境变量和绑定配置
+
+3. **开发便利性**：
+   - 实时重载：代码更改后自动重启服务
+   - 内置调试工具
+   - 详细的错误日志和堆栈跟踪
+   - 本地资源模拟，无需真实Cloudflare账户
+
+4. **资源隔离**：每个开发者都有独立的本地资源实例，避免团队间的冲突。
+
+5. **离线开发**：可以在没有网络连接的情况下进行开发和测试。
+
+**替代启动方法**（不推荐）：
+如果Wrangler出现问题，也可以直接使用Node.js运行，但这不会提供Cloudflare特性的模拟：
+```bash
+cd backend
+npx tsx src/index.ts
+```
 
 #### 启动管理后台
 
@@ -152,7 +173,26 @@ nvm install 18
 nvm use 18
 ```
 
-### 2. Wrangler认证问题
+或者使用v20版本：
+```bash
+nvm install 20
+nvm use 20
+```
+
+推荐使用Node.js LTS版本（v18或v20），因为它们经过充分测试且稳定性更好。
+
+如果切换版本后仍然有问题，请尝试清理并重新安装依赖：
+```bash
+# 在项目根目录执行
+rm -rf node_modules
+npm install
+```
+
+### 2. Next.js模块找不到错误
+
+如果遇到类似`Cannot find module '../server/require-hook'`的错误，通常是由于Node.js版本不兼容导致的。请按照上述方法切换Node.js版本并重新安装依赖。
+
+### 3. Wrangler认证问题
 
 如果Wrangler提示需要认证：
 

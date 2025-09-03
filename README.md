@@ -70,6 +70,8 @@ cd backend
 npm run dev
 ```
 
+这将使用Cloudflare Wrangler启动后端服务，提供与生产环境一致的开发环境，包括本地模拟的D1数据库、R2存储等Cloudflare特性。
+
 #### 启动管理后台
 
 ```bash
