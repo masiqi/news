@@ -49,11 +49,23 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      // 这里应该是登录API调用，暂时留空
-      // 登录成功后应该跳转到仪表板页面
-      // router.push('/dashboard');
-      
-      setError('登录功能尚未实现');
+      // 调用登录API
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        // 登录成功，跳转到仪表板页面
+        router.push('/dashboard');
+      } else {
+        setError(data.error || '登录失败，请稍后再试');
+      }
     } catch (err) {
       setError('网络错误，请稍后再试');
     } finally {

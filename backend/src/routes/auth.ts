@@ -4,6 +4,7 @@ import { users } from "../db/schema";
 import { db } from "../db";
 import bcrypt from "bcrypt";
 import { R2Service } from "../services/r2.service";
+import jwt from "jsonwebtoken";
 
 const SALT_ROUNDS = 10;
 
@@ -75,6 +76,60 @@ authRoutes.post("/register", async (c) => {
     }, 201);
   } catch (error) {
     console.error("注册错误:", error);
+    return c.json({ error: "服务器内部错误" }, 500);
+  }
+});
+
+// 登录端点
+authRoutes.post("/login", async (c) => {
+  try {
+    const { email, password } = await c.req.json();
+
+    // 验证输入
+    if (!email || !password) {
+      return c.json({ error: "邮箱和密码是必填项" }, 400);
+    }
+
+    // 验证邮箱格式
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return c.json({ error: "请输入有效的邮箱地址" }, 400);
+    }
+
+    // 查找用户
+    const user = await db.select().from(users).where(eq(users.email, email)).get();
+    if (!user) {
+      // 为了安全，不透露具体错误原因
+      return c.json({ error: "邮箱或密码错误" }, 401);
+    }
+
+    // 验证密码
+    const isValidPassword = await bcrypt.compare(password, user.passwordHash);
+    if (!isValidPassword) {
+      // 为了安全，不透露具体错误原因
+      return c.json({ error: "邮箱或密码错误" }, 401);
+    }
+
+    // 生成JWT令牌
+    const payload = {
+      id: user.id,
+      email: user.email
+    };
+
+    // 使用环境变量中的JWT密钥，如果没有则使用默认值（实际生产中应始终使用环境变量）
+    const secret = c.env.JWT_SECRET || "default_secret_key";
+    const token = jwt.sign(payload, secret, { expiresIn: "24h" });
+
+    return c.json({ 
+      message: "登录成功",
+      token,
+      user: { 
+        id: user.id, 
+        email: user.email 
+      } 
+    }, 200);
+  } catch (error) {
+    console.error("登录错误:", error);
     return c.json({ error: "服务器内部错误" }, 500);
   }
 });
