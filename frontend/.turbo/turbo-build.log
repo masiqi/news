@@ -1,0 +1,37 @@
+
+> frontend@0.1.0 build
+> next build --turbopack
+
+ ⚠ Warning: Next.js inferred your workspace root, but it may not be correct.
+ We detected multiple lockfiles and selected the directory of /work/llm/news/package-lock.json as the root directory.
+ To silence this warning, set `turbopack.root` in your Next.js config, or consider removing one of the lockfiles if it's not needed.
+   See https://nextjs.org/docs/app/api-reference/config/next-config-js/turbopack#root-directory for more information.
+ Detected additional lockfiles: 
+   * /work/llm/news/frontend/package-lock.json
+
+   ▲ Next.js 15.5.2 (Turbopack)
+
+   Creating an optimized production build ...
+ ✓ Finished writing to disk in 63ms
+ ✓ Compiled successfully in 4.4s
+   Linting and checking validity of types ...
+   Collecting page data ...
+   Generating static pages (0/5) ...
+   Generating static pages (1/5) 
+   Generating static pages (2/5) 
+   Generating static pages (3/5) 
+ ✓ Generating static pages (5/5)
+   Finalizing page optimization ...
+   Collecting build traces ...
+
+Route (app)                         Size  First Load JS
+┌ ○ /                            5.41 kB         119 kB
+└ ○ /_not-found                      0 B         113 kB
++ First Load JS shared by all     117 kB
+  ├ chunks/24a5f28df26bbad3.js   75.3 kB
+  ├ chunks/9d56ee774c61e804.js   20.4 kB
+  └ other shared chunks (total)  21.2 kB
+
+
+○  (Static)  prerendered as static content
+

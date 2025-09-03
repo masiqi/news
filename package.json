@@ -1,0 +1,38 @@
+{
+  "name": "news",
+  "version": "1.0.0",
+  "description": "AI资讯服务平台",
+  "main": "index.js",
+  "packageManager": "npm@9.2.0",
+  "workspaces": [
+    "frontend",
+    "backend",
+    "admin"
+  ],
+  "scripts": {
+    "dev": "turbo dev",
+    "build": "turbo build",
+    "test": "turbo test",
+    "lint": "turbo lint",
+    "clean": "turbo clean"
+  },
+  "devDependencies": {
+    "turbo": "^2.5.6"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/masiqi/news.git"
+  },
+  "keywords": [
+    "ai",
+    "news",
+    "rss",
+    "cloudflare"
+  ],
+  "author": "AI News Platform Team",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/masiqi/news/issues"
+  },
+  "homepage": "https://github.com/masiqi/news#readme"
+}
