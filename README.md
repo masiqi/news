@@ -49,7 +49,11 @@ npm install
 ### 启动开发服务器
 
 ```bash
+# 方法1: 使用Turborepo启动（推荐）
 npm run dev
+
+# 方法2: 使用启动脚本启动
+./start.sh
 ```
 
 这将同时启动前端、后端和管理后台服务。
