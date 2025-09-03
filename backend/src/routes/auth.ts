@@ -2,14 +2,50 @@ import { Hono } from "hono";
 import { eq } from "drizzle-orm";
 import { users } from "../db/schema";
 import { initDB } from "../db";
-import bcrypt from "bcrypt";
 import { R2Service } from "../services/r2.service";
 import jwt from "jsonwebtoken";
 
-const SALT_ROUNDS = 10;
-
 // 简单的JWT令牌黑名单存储（在生产环境中应使用Redis等外部存储）
 const tokenBlacklist = new Set<string>();
+
+// 使用Web Crypto API进行密码哈希
+async function hashPassword(password: string): Promise<string> {
+  // 生成随机盐值
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  
+  // 将密码和盐值组合
+  const encoder = new TextEncoder();
+  const data = encoder.encode(password + Array.from(salt).join(''));
+  
+  // 使用SHA-256进行哈希
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  
+  // 将盐值和哈希值组合成字符串存储
+  const saltHex = Array.from(salt).map(b => b.toString(16).padStart(2, '0')).join('');
+  const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  
+  return `${saltHex}:${hashHex}`;
+}
+
+// 验证密码
+async function verifyPassword(password: string, hashedPassword: string): Promise<boolean> {
+  const [saltHex, hashHex] = hashedPassword.split(':');
+  
+  // 将十六进制盐值转换为字节数组
+  const salt = new Uint8Array(saltHex.match(/.{1,2}/g)!.map(byte => parseInt(byte, 16)));
+  
+  // 将密码和盐值组合
+  const encoder = new TextEncoder();
+  const data = encoder.encode(password + Array.from(salt).join(''));
+  
+  // 使用SHA-256进行哈希
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  const computedHashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  
+  return computedHashHex === hashHex;
+}
 
 const authRoutes = new Hono<{ Bindings: CloudflareBindings }>();
 
@@ -48,7 +84,7 @@ authRoutes.post("/register", async (c) => {
     }
 
     // 加密密码
-    const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
+    const hashedPassword = await hashPassword(password);
     
     // 创建新用户
     const newUser = await db.insert(users).values({
@@ -113,7 +149,7 @@ authRoutes.post("/login", async (c) => {
     }
 
     // 验证密码
-    const isValidPassword = await bcrypt.compare(password, user.passwordHash);
+    const isValidPassword = await verifyPassword(password, user.passwordHash);
     if (!isValidPassword) {
       // 为了安全，不透露具体错误原因
       return c.json({ error: "邮箱或密码错误" }, 401);

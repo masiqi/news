@@ -50,6 +50,10 @@ npm install
 
 如果遇到React版本不兼容问题，启动脚本会自动检查并处理依赖安装。
 
+### 密码哈希实现
+
+后端服务使用Web Crypto API实现密码哈希，替代了bcrypt库，以确保在Cloudflare Workers环境中正常运行。
+
 ## 启动服务
 
 ### 1. 启动所有服务（推荐）
