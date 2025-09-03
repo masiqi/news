@@ -8,6 +8,9 @@ import jwt from "jsonwebtoken";
 
 const SALT_ROUNDS = 10;
 
+// 简单的JWT令牌黑名单存储（在生产环境中应使用Redis等外部存储）
+const tokenBlacklist = new Set<string>();
+
 const authRoutes = new Hono<{ Bindings: CloudflareBindings }>();
 
 // 注册端点
@@ -116,8 +119,12 @@ authRoutes.post("/login", async (c) => {
       email: user.email
     };
 
-    // 使用环境变量中的JWT密钥，如果没有则使用默认值（实际生产中应始终使用环境变量）
-    const secret = c.env.JWT_SECRET || "default_secret_key";
+    // 使用环境变量中的JWT密钥，如果没有则抛出错误（生产环境必须配置JWT密钥）
+    const secret = c.env.JWT_SECRET;
+    if (!secret) {
+      console.error("JWT_SECRET环境变量未配置");
+      return c.json({ error: "服务器配置错误" }, 500);
+    }
     const token = jwt.sign(payload, secret, { expiresIn: "24h" });
 
     return c.json({ 
@@ -130,6 +137,38 @@ authRoutes.post("/login", async (c) => {
     }, 200);
   } catch (error) {
     console.error("登录错误:", error);
+    return c.json({ error: "服务器内部错误" }, 500);
+  }
+});
+
+// 登出端点
+authRoutes.post("/logout", async (c) => {
+  try {
+    // 获取JWT令牌
+    const authHeader = c.req.header('Authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return c.json({ error: "未提供有效的认证令牌" }, 401);
+    }
+
+    const token = authHeader.substring(7); // 移除 "Bearer " 前缀
+
+    // 验证令牌是否已在黑名单中
+    if (tokenBlacklist.has(token)) {
+      return c.json({ error: "令牌已失效" }, 401);
+    }
+
+    // 将令牌添加到黑名单中
+    tokenBlacklist.add(token);
+
+    // 在实际应用中，这里还应该：
+    // 1. 记录登出事件用于审计
+    // 2. 如果使用刷新令牌，也应清除刷新令牌
+
+    return c.json({ 
+      message: "登出成功" 
+    }, 200);
+  } catch (error) {
+    console.error("登出错误:", error);
     return c.json({ error: "服务器内部错误" }, 500);
   }
 });

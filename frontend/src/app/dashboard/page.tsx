@@ -12,8 +12,7 @@ export default function DashboardPage() {
     // 检查用户是否已登录
     const checkLoginStatus = async () => {
       try {
-        // 这里应该检查JWT令牌有效性
-        // 暂时简化处理
+        // 检查JWT令牌有效性
         const token = document.cookie
           .split('; ')
           .find(row => row.startsWith('token='))
@@ -25,8 +24,9 @@ export default function DashboardPage() {
           return;
         }
 
-        // 验证令牌有效性（简化处理）
+        // 验证令牌有效性
         // 实际应用中应该调用后端API验证令牌
+        // 这里简化处理，仅检查令牌存在性
         setUser({ email: 'user@example.com' }); // 示例用户数据
       } catch (error) {
         console.error('检查登录状态失败:', error);
@@ -39,11 +39,46 @@ export default function DashboardPage() {
     checkLoginStatus();
   }, [router]);
 
-  const handleLogout = () => {
-    // 清除令牌Cookie
-    document.cookie = 'token=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/';
-    // 跳转到登录页面
-    router.push('/login');
+  const handleLogout = async () => {
+    try {
+      // 获取JWT令牌
+      const token = document.cookie
+        .split('; ')
+        .find(row => row.startsWith('token='))
+        ?.split('=')[1];
+
+      if (!token) {
+        // 如果没有令牌，直接跳转到登录页面
+        router.push('/login');
+        return;
+      }
+
+      // 调用后端登出API
+      const response = await fetch('/api/auth/logout', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ token }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        // 登出成功，跳转到登录页面
+        router.push('/login?loggedOut=true');
+      } else {
+        // 登出失败，显示错误信息
+        console.error('登出失败:', data.error);
+        // 仍然跳转到登录页面
+        router.push('/login?loggedOut=true');
+      }
+    } catch (error) {
+      console.error('登出API错误:', error);
+      // 即使API调用失败，也清除本地令牌并跳转到登录页面
+      document.cookie = 'token=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/';
+      router.push('/login?loggedOut=true');
+    }
   };
 
   if (loading) {
