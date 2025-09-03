@@ -180,6 +180,8 @@ python -m http.server 8000
 
 Wrangler会自动创建本地D1数据库用于开发。数据库模式由Drizzle ORM管理。
 
+在开发环境中，Wrangler会自动创建一个名为`news_platform`的本地D1数据库实例。
+
 ### 数据库迁移
 
 如果需要重置或更新数据库模式：
@@ -188,6 +190,10 @@ Wrangler会自动创建本地D1数据库用于开发。数据库模式由Drizzle
 cd backend
 npx drizzle-kit push
 ```
+
+### 数据库绑定配置
+
+后端服务通过`DB`绑定访问D1数据库。在`wrangler.jsonc`中已配置数据库绑定。
 
 ## 部署
 
