@@ -15,6 +15,8 @@ export const sources = sqliteTable('sources', {
   userId: integer('user_id').notNull().references(() => users.id),
   url: text('url').notNull(),
   name: text('name').notNull(),
+  isPublic: integer('is_public', { mode: 'boolean' }).default(false).notNull(), // 是否为公共源
+  originalSourceId: integer('original_source_id'), // 复制自哪个源（自引用）
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
 });
 
