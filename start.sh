@@ -33,9 +33,9 @@ PIDS+=($ADMIN_PID)
 cd ..
 
 echo "所有服务已启动:"
-echo "  前端服务 PID: $FRONTEND_PID (http://localhost:3000)"
-echo "  后端服务 PID: $BACKEND_PID (http://localhost:8787)"
-echo "  管理后台 PID: $ADMIN_PID (http://localhost:8000)"
+echo "  前端服务 PID: $FRONTEND_PID (http://0.0.0.0:3000)"
+echo "  后端服务 PID: $BACKEND_PID (http://0.0.0.0:8787)"
+echo "  管理后台 PID: $ADMIN_PID (http://0.0.0.0:8000)"
 echo ""
 echo "按 Ctrl+C 停止所有服务"
 

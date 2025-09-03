@@ -33,6 +33,6 @@ if [ ! -d "node_modules" ]; then
     npm install
 fi
 
-# 启动前端服务
+# 启动前端服务，监听所有接口
 echo "正在启动前端服务..."
-npm run dev
+npm run dev -- --hostname 0.0.0.0

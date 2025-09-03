@@ -19,6 +19,6 @@ if ! command -v python3 &> /dev/null; then
     exit 1
 fi
 
-# 启动管理后台服务
+# 启动管理后台服务，监听所有接口
 echo "正在启动管理后台服务..."
-python3 -m http.server $PORT
+python3 -m http.server $PORT --bind 0.0.0.0

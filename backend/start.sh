@@ -19,6 +19,6 @@ if [ ! -d "node_modules" ]; then
     npm install
 fi
 
-# 启动后端服务
+# 启动后端服务，监听所有接口
 echo "正在启动后端服务..."
-npm run dev
+npm run dev -- --ip 0.0.0.0
