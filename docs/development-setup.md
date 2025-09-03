@@ -50,6 +50,35 @@ npm install
 
 如果遇到React版本不兼容问题，启动脚本会自动检查并处理依赖安装。
 
+#### 常见错误信息：
+```
+Error: Next.js requires react >= 18.2.0 to be installed.
+```
+
+#### 解决方法：
+1. 清理现有依赖：
+   ```bash
+   # 在项目根目录执行
+   rm -rf node_modules package-lock.json
+   cd frontend && rm -rf node_modules package-lock.json && cd ..
+   cd backend && rm -rf node_modules package-lock.json && cd ..
+   cd admin && rm -rf node_modules package-lock.json && cd ..
+   ```
+
+2. 重新安装依赖：
+   ```bash
+   npm install
+   ```
+
+3. 如果问题仍然存在，可以尝试强制使用正确的React版本：
+   ```bash
+   cd frontend
+   npm install react@^18.2.0 react-dom@^18.2.0
+   ```
+
+#### 根本原因：
+在monorepo项目中，可能存在多个版本的React依赖冲突。通过在根目录的`package.json`中添加`overrides`字段可以强制使用统一版本。
+
 ### 密码哈希实现
 
 后端服务使用Web Crypto API实现密码哈希，替代了bcrypt库，以确保在Cloudflare Workers环境中正常运行。
