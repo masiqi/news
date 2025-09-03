@@ -20,14 +20,46 @@ export const sources = sqliteTable('sources', {
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
 });
 
-// 笔记表
-export const notes = sqliteTable('notes', {
+// RSS条目表 - 存储原始RSS条目信息
+export const rssEntries = sqliteTable('rss_entries', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  sourceId: integer('source_id').notNull().references(() => sources.id),
+  guid: text('guid').notNull(), // RSS条目唯一标识
+  title: text('title').notNull(),
+  link: text('link').notNull(),
+  content: text('content'), // 原始内容
+  publishedAt: integer('published_at', { mode: 'timestamp' }).notNull(), // 发布时间
+  processed: integer('processed', { mode: 'boolean' }).default(false).notNull(), // 是否已处理
+  processedAt: integer('processed_at', { mode: 'timestamp' }), // 处理时间
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+});
+
+// 处理后的内容表 - 存储已处理的内容
+export const processedContents = sqliteTable('processed_contents', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  entryId: integer('entry_id').notNull().references(() => rssEntries.id),
+  summary: text('summary').notNull(), // AI生成的摘要
+  markdownContent: text('markdown_content').notNull(), // AI处理后的Markdown内容
+  keywords: text('keywords'), // 关键词
+  sentiment: text('sentiment'), // 情感分析结果
+  processingTime: integer('processing_time'), // 处理耗时（毫秒）
+  modelUsed: text('model_used'), // 使用的AI模型
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+});
+
+// 用户笔记表 - 存储用户个性化内容
+export const userNotes = sqliteTable('user_notes', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   userId: integer('user_id').notNull().references(() => users.id),
-  sourceId: integer('source_id').notNull().references(() => sources.id),
-  title: text('title').notNull(),
-  content: text('content').notNull(),
+  entryId: integer('entry_id').notNull().references(() => rssEntries.id),
+  processedContentId: integer('processed_content_id').notNull().references(() => processedContents.id),
+  title: text('title').notNull(), // 个性化标题
+  content: text('content').notNull(), // 个性化内容
+  personalTags: text('personal_tags'), // 用户个性化标签
+  isFavorite: integer('is_favorite', { mode: 'boolean' }).default(false).notNull(), // 是否收藏
+  readStatus: integer('read_status').default(0).notNull(), // 阅读状态（0未读，1已读）
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
 });
 
 // 同步凭证表
