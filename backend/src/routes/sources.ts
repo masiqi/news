@@ -65,7 +65,7 @@ sourceRoutes.post("/", async (c) => {
     const userId = 1; // 示例用户ID，实际应该从令牌中提取
 
     const body = await c.req.json();
-    const { url, name, isPublic } = body;
+    const { url, name, description, isPublic } = body;
 
     // 验证输入
     if (!url || !name) {
@@ -76,6 +76,7 @@ sourceRoutes.post("/", async (c) => {
       userId,
       url,
       name,
+      description: description || null,
       isPublic: isPublic || false,
       createdAt: new Date(),
     };
@@ -142,10 +143,10 @@ sourceRoutes.put("/:id", async (c) => {
     }
 
     const body = await c.req.json();
-    const { url, name, isPublic } = body;
+    const { url, name, description, isPublic } = body;
 
     const sourceService = c.get('sourceService') as SourceService;
-    const updatedSource = await sourceService.updateSource(sourceId, { url, name, isPublic }, userId);
+    const updatedSource = await sourceService.updateSource(sourceId, { url, name, description, isPublic }, userId);
     
     if (!updatedSource) {
       return c.json({ error: "无法更新源，源可能不存在或无权限" }, 404);

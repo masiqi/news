@@ -20,8 +20,10 @@ export default function MySourcesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
+  const [editingSource, setEditingSource] = useState<Source | null>(null);
   const [name, setName] = useState('');
   const [url, setUrl] = useState('');
+  const [description, setDescription] = useState('');
   const [isPublic, setIsPublic] = useState(false);
   const router = useRouter();
 
@@ -51,28 +53,64 @@ export default function MySourcesPage() {
     e.preventDefault();
     
     try {
-      const response = await fetch('/api/sources', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ name, url, isPublic }),
-      });
-      
-      const data = await response.json();
-      
-      if (response.ok) {
-        setName('');
-        setUrl('');
-        setIsPublic(false);
-        setShowForm(false);
-        fetchMySources(); // 重新获取源列表
+      if (editingSource) {
+        // 编辑模式
+        const response = await fetch(`/api/sources/${editingSource.id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ name, url, description, isPublic }),
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+          setEditingSource(null);
+          setName('');
+          setUrl('');
+          setDescription('');
+          setIsPublic(false);
+          setShowForm(false);
+          fetchMySources(); // 重新获取源列表
+        } else {
+          alert(data.error || '更新源失败');
+        }
       } else {
-        alert(data.error || '创建源失败');
+        // 创建模式
+        const response = await fetch('/api/sources', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ name, url, description, isPublic }),
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok) {
+          setName('');
+          setUrl('');
+          setDescription('');
+          setIsPublic(false);
+          setShowForm(false);
+          fetchMySources(); // 重新获取源列表
+        } else {
+          alert(data.error || '创建源失败');
+        }
       }
     } catch (err) {
       alert('网络错误');
     }
+  };
+
+  const handleEditSource = (source: Source) => {
+    setEditingSource(source);
+    setName(source.name);
+    setUrl(source.url);
+    setDescription(source.description || '');
+    setIsPublic(source.isPublic);
+    setShowForm(true);
   };
 
   const handleDeleteSource = async (sourceId: number) => {
@@ -121,11 +159,11 @@ export default function MySourcesPage() {
             
             {showForm && (
               <div className="border-4 border-dashed border-gray-200 rounded-lg p-4 mb-6">
-                <h2 className="text-xl font-semibold mb-4">添加新的RSS源</h2>
+                <h2 className="text-xl font-semibold mb-4">{editingSource ? '编辑RSS源' : '添加新的RSS源'}</h2>
                 <form onSubmit={handleSubmit}>
                   <div className="space-y-4">
                     <div>
-                      <label htmlFor="name" className="block text-sm font-medium text-gray-700">
+                      <label htmlFor="name" className="block text-sm font-medium text-gray-900">
                         名称
                       </label>
                       <input
@@ -138,7 +176,7 @@ export default function MySourcesPage() {
                       />
                     </div>
                     <div>
-                      <label htmlFor="url" className="block text-sm font-medium text-gray-700">
+                      <label htmlFor="url" className="block text-sm font-medium text-gray-900">
                         URL
                       </label>
                       <input
@@ -148,6 +186,18 @@ export default function MySourcesPage() {
                         onChange={(e) => setUrl(e.target.value)}
                         className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
                         required
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor="description" className="block text-sm font-medium text-gray-900">
+                        描述（可选）
+                      </label>
+                      <textarea
+                        id="description"
+                        value={description || ''}
+                        onChange={(e) => setDescription(e.target.value)}
+                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                        rows={3}
                       />
                     </div>
                     <div className="flex items-center">
@@ -175,7 +225,7 @@ export default function MySourcesPage() {
                         type="submit"
                         className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
                       >
-                        添加源
+                        {editingSource ? '更新源' : '添加源'}
                       </button>
                     </div>
                   </div>
@@ -185,7 +235,7 @@ export default function MySourcesPage() {
             
             <div className="border-4 border-dashed border-gray-200 rounded-lg p-4">
               <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-semibold">我的RSS源</h2>
+                <h2 className="text-xl font-semibold text-gray-900">我的RSS源</h2>
                 <div className="space-x-2">
                   <button
                     onClick={() => router.push('/sources/public')}
@@ -204,7 +254,7 @@ export default function MySourcesPage() {
               
               {sources.length === 0 ? (
                 <div className="text-center py-8">
-                  <p className="text-gray-500 mb-4">暂无RSS源</p>
+                  <p className="text-gray-700 mb-4">暂无RSS源</p>
                   <button
                     onClick={() => setShowForm(true)}
                     className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
@@ -217,6 +267,9 @@ export default function MySourcesPage() {
                   {sources.map((source) => (
                     <div key={source.id} className="border border-gray-200 rounded-lg p-4">
                       <h3 className="text-lg font-medium text-gray-900">{source.name}</h3>
+                      {source.description && (
+                        <p className="text-sm text-gray-600 mt-1">{source.description}</p>
+                      )}
                       <p className="text-sm text-gray-500 mt-1 truncate">{source.url}</p>
                       <div className="mt-4 flex justify-between items-center">
                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
@@ -232,6 +285,12 @@ export default function MySourcesPage() {
                               副本
                             </span>
                           )}
+                          <button
+                            onClick={() => handleEditSource(source)}
+                            className="inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                          >
+                            编辑
+                          </button>
                           <button
                             onClick={() => handleDeleteSource(source.id)}
                             className="inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"

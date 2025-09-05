@@ -23,6 +23,38 @@
 			"migrations_dir": "src/db/migrations"
 		}
 	],
+	"r2_buckets": [
+		{
+			"binding": "R2_BUCKET",
+			"bucket_name": "news-platform-r2-bucket",
+			"preview_bucket_name": "news-platform-r2-bucket-preview"
+		}
+	],
+	"queues": {
+		"producers": [
+			{
+				"queue": "rss-fetcher-queue",
+				"binding": "RSS_FETCHER_QUEUE"
+			},
+			{
+				"queue": "ai-processor-queue",
+				"binding": "AI_PROCESSOR_QUEUE"
+			}
+		],
+		"consumers": [
+			{
+				"queue": "rss-fetcher-queue",
+				"workers": ["rss-fetcher-worker"]
+			},
+			{
+				"queue": "ai-processor-queue",
+				"workers": ["ai-processor-worker"]
+			}
+		]
+	},
+	"triggers": {
+		"crons": ["0 * * * *"]
+	},
 	"vars": {
 		"JWT_SECRET": "development_jwt_secret_key_for_local_testing_only"
 	}

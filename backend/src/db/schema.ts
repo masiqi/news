@@ -15,8 +15,12 @@ export const sources = sqliteTable('sources', {
   userId: integer('user_id').notNull().references(() => users.id),
   url: text('url').notNull(),
   name: text('name').notNull(),
+  description: text('description'), // RSS源描述
   isPublic: integer('is_public', { mode: 'boolean' }).default(false).notNull(), // 是否为公共源
   originalSourceId: integer('original_source_id'), // 复制自哪个源（自引用）
+  lastFetchedAt: integer('last_fetched_at', { mode: 'timestamp' }), // 上次获取时间
+  fetchFailureCount: integer('fetch_failure_count').default(0).notNull(), // 连续失败次数
+  fetchErrorMessage: text('fetch_error_message'), // 最近的错误信息
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
 });
 

@@ -142,7 +142,7 @@ npx serve
 
 - [产品需求文档](docs/prd.md)
 - [架构文档](docs/architecture.md)
-- [用户故事](docs/stories/)
+- [用户故事列表](docs/STORIES.md)
 - [开发设置指南](docs/development-setup.md)
 
 ## 贡献

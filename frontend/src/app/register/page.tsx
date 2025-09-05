@@ -67,10 +67,11 @@ export default function RegisterPage() {
       const data = await response.json();
 
       if (response.ok) {
-        // 注册成功，跳转到登录页面
-        setSuccess('注册成功！请登录您的账户。');
+        // 注册成功，存储JWT令牌并自动登录
+        document.cookie = `token=${data.token}; path=/`;
+        setSuccess('注册成功！正在跳转到仪表板...');
         setTimeout(() => {
-          router.push('/login?registered=true');
+          router.push('/dashboard');
         }, 2000);
       } else {
         setError(data.error || '注册失败，请稍后再试');

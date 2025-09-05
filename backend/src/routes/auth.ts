@@ -109,8 +109,23 @@ authRoutes.post("/register", async (c) => {
       console.warn(`为用户${user.id}创建R2存储目录失败`);
     }
 
+    // 生成JWT令牌实现自动登录
+    const payload = {
+      id: user.id,
+      email: user.email
+    };
+
+    // 使用环境变量中的JWT密钥，如果没有则抛出错误（生产环境必须配置JWT密钥）
+    const secret = c.env.JWT_SECRET;
+    if (!secret) {
+      console.error("JWT_SECRET环境变量未配置");
+      return c.json({ error: "服务器配置错误" }, 500);
+    }
+    const token = jwt.sign(payload, secret, { expiresIn: "24h" });
+
     return c.json({ 
       message: "注册成功", 
+      token,
       user: { 
         id: user.id, 
         email: user.email 

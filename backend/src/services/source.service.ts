@@ -6,7 +6,11 @@ import type { Source, NewSource } from '../db/types';
 import type { User, NewUser } from '../db/types';
 
 export class SourceService {
-  constructor(private db: any) {}
+  private db: ReturnType<typeof drizzle>;
+
+  constructor(d1: D1Database) {
+    this.db = drizzle(d1);
+  }
 
   /**
    * 创建新的RSS源
@@ -112,6 +116,7 @@ export class SourceService {
       userId,
       url: sourceToCopy.url,
       name: `${sourceToCopy.name} (副本)`,
+      description: sourceToCopy.description, // 复制描述字段
       isPublic: false, // 复制的源默认为私有
       originalSourceId: sourceToCopy.id, // 记录原始源ID
       createdAt: new Date(),

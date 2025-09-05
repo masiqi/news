@@ -36,13 +36,14 @@ export async function POST(request: NextRequest) {
     const data = await response.json();
 
     if (response.ok) {
-      // 登录成功，设置HttpOnly Cookie存储JWT令牌
-      const cookieHeader = `token=${data.token}; HttpOnly; Path=/; Max-Age=86400; SameSite=Strict`;
+      // 登录成功，设置Cookie存储JWT令牌（非HttpOnly，以便前端JavaScript可以访问）
+      const cookieHeader = `token=${data.token}; Path=/; Max-Age=86400; SameSite=Strict`;
       
       return new Response(
         JSON.stringify({ 
           message: '登录成功', 
-          user: data.user 
+          user: data.user,
+          token: data.token
         }),
         { 
           status: 200, 

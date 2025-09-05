@@ -88,7 +88,7 @@ export default function PublicSourcesPage() {
             )}
             <div className="border-4 border-dashed border-gray-200 rounded-lg p-4">
               <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-semibold">公共RSS源</h2>
+                <h2 className="text-xl font-semibold text-gray-900">公共RSS源</h2>
                 <button
                   onClick={() => router.push('/sources/my')}
                   className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
@@ -97,15 +97,18 @@ export default function PublicSourcesPage() {
                 </button>
               </div>
               <div className="border-4 border-dashed border-gray-200 rounded-lg p-4">
-                <h2 className="text-xl font-semibold mb-4">可用的公共RSS源</h2>
+                <h2 className="text-xl font-semibold mb-4 text-gray-900">可用的公共RSS源</h2>
                 {sources.length === 0 ? (
-                  <p>暂无公共RSS源</p>
+                  <p className="text-gray-700">暂无公共RSS源</p>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {sources.map((source) => (
                       <div key={source.id} className="border border-gray-200 rounded-lg p-4">
                         <h3 className="text-lg font-medium text-gray-900">{source.name}</h3>
-                        <p className="text-sm text-gray-500 mt-1 truncate">{source.url}</p>
+                        {source.description && (
+                          <p className="text-sm text-gray-600 mt-1">{source.description}</p>
+                        )}
+                        <p className="text-sm text-gray-700 mt-1 truncate">{source.url}</p>
                         <div className="mt-4 flex justify-between items-center">
                           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
                             公共

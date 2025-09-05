@@ -5,7 +5,11 @@ import { eq, and, desc } from 'drizzle-orm';
 import type { RssEntry, NewRssEntry, ProcessedContent, NewProcessedContent, UserNote, NewUserNote } from '../db/types';
 
 export class ContentCacheService {
-  constructor(private db: any) {}
+  private db: ReturnType<typeof drizzle>;
+
+  constructor(d1: D1Database) {
+    this.db = drizzle(d1);
+  }
 
   /**
    * 检查RSS条目是否已存在
@@ -233,6 +237,66 @@ export class ContentCacheService {
       };
       
       return await this.createUserNote(newUserNote);
+    }
+  }
+
+  /**
+   * 更新RSS源的获取状态
+   * @param sourceId RSS源ID
+   * @param fetchFailureCount 连续失败次数
+   * @param fetchErrorMessage 错误信息
+   * @returns 更新后的源
+   */
+  async updateSourceFetchStatus(
+    sourceId: number,
+    fetchFailureCount: number,
+    fetchErrorMessage: string | null = null
+  ): Promise<any | null> {
+    try {
+      // 导入sources表（需要在函数内部导入以避免循环依赖）
+      const { sources } = await import('../db/schema');
+      const { eq } = await import('drizzle-orm');
+      
+      const result = await this.db.update(sources)
+        .set({
+          fetchFailureCount,
+          fetchErrorMessage,
+          lastFetchedAt: new Date()
+        })
+        .where(eq(sources.id, sourceId))
+        .returning();
+      
+      return result.length > 0 ? result[0] : null;
+    } catch (error) {
+      console.error('更新RSS源获取状态失败:', error);
+      return null;
+    }
+  }
+
+  /**
+   * 重置RSS源的失败计数
+   * @param sourceId RSS源ID
+   * @returns 更新后的源
+   */
+  async resetSourceFailureCount(sourceId: number): Promise<any | null> {
+    try {
+      // 导入sources表（需要在函数内部导入以避免循环依赖）
+      const { sources } = await import('../db/schema');
+      const { eq } = await import('drizzle-orm');
+      
+      const result = await this.db.update(sources)
+        .set({
+          fetchFailureCount: 0,
+          fetchErrorMessage: null,
+          lastFetchedAt: new Date()
+        })
+        .where(eq(sources.id, sourceId))
+        .returning();
+      
+      return result.length > 0 ? result[0] : null;
+    } catch (error) {
+      console.error('重置RSS源失败计数失败:', error);
+      return null;
     }
   }
 }
