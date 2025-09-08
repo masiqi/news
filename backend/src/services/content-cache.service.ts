@@ -1,7 +1,8 @@
 // src/services/content-cache.service.ts
 import { drizzle } from 'drizzle-orm/d1';
-import { rssEntries, processedContents, userNotes } from '../db/schema';
-import { eq, and, desc } from 'drizzle-orm';
+import { rssEntries, processedContents, userNotes, sources } from '../db/schema';
+import { eq, and, desc, count } from 'drizzle-orm';
+import { sql } from 'drizzle-orm';
 import type { RssEntry, NewRssEntry, ProcessedContent, NewProcessedContent, UserNote, NewUserNote } from '../db/types';
 
 export class ContentCacheService {
@@ -297,6 +298,119 @@ export class ContentCacheService {
     } catch (error) {
       console.error('重置RSS源失败计数失败:', error);
       return null;
+    }
+  }
+
+  /**
+   * 获取特定RSS源的条目列表
+   * @param sourceId RSS源ID
+   * @param limit 限制数量
+   * @param offset 偏移量
+   * @returns RSS条目列表（包含处理状态和源信息）
+   */
+  async getSourceEntries(sourceId: number, limit: number = 10, offset: number = 0): Promise<any[]> {
+    try {
+      const result = await this.db
+        .select({
+          id: rssEntries.id,
+          sourceId: rssEntries.sourceId,
+          guid: rssEntries.guid,
+          title: rssEntries.title,
+          link: rssEntries.link,
+          content: rssEntries.content,
+          publishedAt: rssEntries.publishedAt,
+          processed: rssEntries.processed,
+          processedAt: rssEntries.processedAt,
+          failureCount: rssEntries.failureCount,
+          errorMessage: rssEntries.errorMessage,
+          createdAt: rssEntries.createdAt,
+          sourceName: sources.name
+        })
+        .from(rssEntries)
+        .leftJoin(sources, eq(rssEntries.sourceId, sources.id))
+        .where(eq(rssEntries.sourceId, sourceId))
+        .orderBy(desc(rssEntries.publishedAt))
+        .limit(limit)
+        .offset(offset);
+      
+      return result;
+    } catch (error) {
+      console.error('获取RSS源条目失败:', error);
+      return [];
+    }
+  }
+
+  /**
+   * 获取特定RSS源的条目总数
+   * @param sourceId RSS源ID
+   * @returns 条目总数
+   */
+  async getSourceEntriesCount(sourceId: number): Promise<number> {
+    try {
+      const result = await this.db
+        .select({ count: sql<number>`count(*)` })
+        .from(rssEntries)
+        .where(eq(rssEntries.sourceId, sourceId));
+      
+      return result[0]?.count || 0;
+    } catch (error) {
+      console.error('获取RSS源条目总数失败:', error);
+      return 0;
+    }
+  }
+
+  /**
+   * 获取所有RSS条目列表（管理后台用）
+   * @param limit 限制数量
+   * @param offset 偏移量
+   * @returns RSS条目列表（包含处理状态和源信息）
+   */
+  async getAllEntries(limit: number = 20, offset: number = 0): Promise<any[]> {
+    try {
+      const result = await this.db
+        .select({
+          id: rssEntries.id,
+          sourceId: rssEntries.sourceId,
+          guid: rssEntries.guid,
+          title: rssEntries.title,
+          link: rssEntries.link,
+          content: sql<string>`substr(${rssEntries.content}, 1, 200) || case when length(${rssEntries.content}) > 200 then '...' else '' end`,
+          publishedAt: rssEntries.publishedAt,
+          processed: rssEntries.processed,
+          processedAt: rssEntries.processedAt,
+          failureCount: rssEntries.failureCount,
+          errorMessage: rssEntries.errorMessage,
+          createdAt: rssEntries.createdAt,
+          sourceName: sources.name,
+          sourceUrl: sources.url
+        })
+        .from(rssEntries)
+        .leftJoin(sources, eq(rssEntries.sourceId, sources.id))
+        .orderBy(desc(rssEntries.publishedAt))
+        .limit(limit)
+        .offset(offset);
+      
+      return result;
+    } catch (error) {
+      console.error('获取所有RSS条目失败:', error);
+      return [];
+    }
+  }
+
+  /**
+   * 获取所有RSS条目总数（管理后台用）
+   * @returns 条目总数
+   */
+  async getAllEntriesCount(): Promise<number> {
+    try {
+      const result = await this.db
+        .select({ count: sql<number>`count(*)` })
+        .from(rssEntries);
+      
+      return result[0]?.count || 0;
+    } catch (error) {
+      console.error('获取所有RSS条目总数失败:', error);
+      return 0;
     }
   }
 }

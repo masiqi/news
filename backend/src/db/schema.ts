@@ -46,7 +46,7 @@ export const processedContents = sqliteTable('processed_contents', {
   entryId: integer('entry_id').notNull().references(() => rssEntries.id),
   summary: text('summary').notNull(), // AI生成的摘要
   markdownContent: text('markdown_content').notNull(), // AI处理后的Markdown内容
-  keywords: text('keywords'), // 关键词
+  keywords: text('keywords'), // 关键词（逗号分隔）
   sentiment: text('sentiment'), // 情感分析结果
   processingTime: integer('processing_time'), // 处理耗时（毫秒）
   modelUsed: text('model_used'), // 使用的AI模型

@@ -1,0 +1,26 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "rss-scheduler",
+  "main": "src/workers/rss-scheduler.ts",
+  "compatibility_date": "2025-08-29",
+  "compatibility_flags": ["nodejs_compat"],
+  "triggers": {
+    "crons": ["0 * * * *"]
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "news_platform",
+      "database_id": "news_platform_db",
+      "migrations_dir": "src/db/migrations"
+    }
+  ],
+  "queues": {
+    "producers": [
+      {
+        "queue": "rss-fetcher-queue",
+        "binding": "RSS_FETCHER_QUEUE"
+      }
+    ]
+  }
+}
