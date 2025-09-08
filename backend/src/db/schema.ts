@@ -68,14 +68,36 @@ export const userNotes = sqliteTable('user_notes', {
   updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
 });
 
-// 同步凭证表
+// 同步凭证表 - 存储用户的R2访问凭证
 export const syncCredentials = sqliteTable('sync_credentials', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   userId: integer('user_id').notNull().references(() => users.id),
-  accessKey: text('access_key').notNull(),
-  secretKey: text('secret_key').notNull(),
+  name: text('name').notNull(), // 凭证名称，便于用户识别
+  accessKeyId: text('access_key_id').notNull(), // R2访问密钥ID
+  secretAccessKey: text('secret_access_key').notNull(), // R2秘密访问密钥（加密存储）
+  region: text('region').notNull(), // R2区域，如 'auto' 或 'us-east-1'
+  endpoint: text('endpoint').notNull(), // R2端点URL
+  bucket: text('bucket').notNull(), // R2桶名称
+  prefix: text('prefix').notNull(), // 用户专属前缀，确保数据隔离
+  permissions: text('permissions', { default: 'readonly' }).notNull(), // 权限类型，默认为只读
+  isActive: integer('is_active', { mode: 'boolean' }).default(true).notNull(), // 凭证是否激活
+  lastUsedAt: integer('last_used_at', { mode: 'timestamp' }), // 上次使用时间
+  expiresAt: integer('expires_at', { mode: 'timestamp' }), // 凭证过期时间
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
-  expiresAt: integer('expires_at', { mode: 'timestamp' }).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
+});
+
+// 凭证使用日志表 - 记录凭证的所有操作，用于安全审计
+export const credentialLogs = sqliteTable('credential_logs', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  credentialId: integer('credential_id').notNull().references(() => syncCredentials.id),
+  userId: integer('user_id').notNull().references(() => users.id),
+  action: text('action', { default: 'created' }).notNull(), // 操作类型：'created', 'accessed', 'revoked', 'regenerated', 'deleted'
+  ipAddress: text('ip_address').notNull(), // 操作时的IP地址
+  userAgent: text('user_agent'), // 操作时的User-Agent
+  timestamp: integer('timestamp', { mode: 'timestamp' }).notNull(),
+  details: text('details'), // 操作详情，JSON格式存储额外信息
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
 });
 
 // 队列处理状态跟踪表
