@@ -10,5 +10,37 @@
   },
   "assets": {
     "directory": "./public"
+  },
+  "queues": {
+    "producers": [
+      {
+        "queue": "RSS_PROCESSOR_QUEUE",
+        "max_batch_size": 10,
+        "max_wait_time_ms": 5000,
+        "max_retries": 3,
+        "dead_letter_queue": "RSS_PROCESSOR_DLQ"
+      },
+      {
+        "queue": "AI_PROCESSOR_QUEUE",
+        "max_batch_size": 5,
+        "max_wait_time_ms": 10000,
+        "max_retries": 3,
+        "dead_letter_queue": "AI_PROCESSOR_DLQ"
+      }
+    ],
+    "consumers": [
+      {
+        "queue": "RSS_PROCESSOR_QUEUE",
+        "script": "src/workers/rss-fetcher.ts",
+        "max_batch_size": 10,
+        "max_wait_time_ms": 5000
+      },
+      {
+        "queue": "AI_PROCESSOR_QUEUE",
+        "script": "src/workers/ai-processor.ts",
+        "max_batch_size": 5,
+        "max_wait_time_ms": 10000
+      }
+    ]
   }
 }

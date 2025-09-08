@@ -5,7 +5,10 @@
 		"dev": "wrangler dev",
 		"dev:scheduler": "wrangler dev --config wrangler-rss-scheduler.jsonc",
 		"deploy": "wrangler deploy --minify",
-		"cf-typegen": "wrangler types --env-interface CloudflareBindings"
+		"cf-typegen": "wrangler types --env-interface CloudflareBindings",
+		"test": "vitest",
+		"test:ui": "vitest --ui",
+		"test:run": "vitest run"
 	},
 	"dependencies": {
 		"@cloudflare/d1": "^1.4.1",
@@ -16,7 +19,9 @@
 	},
 	"devDependencies": {
 		"@cloudflare/workers-types": "^4.20250906.0",
+		"@types/node": "^24.3.1",
 		"drizzle-kit": "^0.31.4",
+		"vitest": "^3.2.4",
 		"wrangler": "^4.34.0"
 	}
 }

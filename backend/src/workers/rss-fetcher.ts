@@ -5,6 +5,7 @@ import { rssEntries, sources } from '../db/schema';
 import { eq } from 'drizzle-orm';
 import { ContentCacheService } from '../services/content-cache.service';
 import { SourceService } from '../services/source.service';
+import { QueueProducerService } from '../services/queue/producer';
 import Parser from 'rss-parser';
 
 // 最大失败重试次数
@@ -15,6 +16,7 @@ const RETRY_DELAYS = [1000, 5000, 15000]; // 1秒, 5秒, 15秒
 
 interface Env {
   DB: D1Database;
+  RSS_PROCESSOR_QUEUE: Queue<any>;
   AI_PROCESSOR_QUEUE: Queue<any>;
   // 其他环境变量
 }
@@ -95,7 +97,17 @@ export default {
         // 解析RSS内容
         const entries = await parseRssContent(rssContent);
 
+        // 创建队列生产者
+        const queueProducer = new QueueProducerService(env.AI_PROCESSOR_QUEUE, {
+          maxBatchSize: 5,
+          maxWaitTimeMs: 10000,
+          maxRetries: 3,
+          deadLetterQueue: 'AI_PROCESSOR_DLQ'
+        });
+
         // 处理每个条目
+        const messagesToSend = [];
+        
         for (const entry of entries) {
           try {
             // 检查条目是否已存在并处理
@@ -117,18 +129,32 @@ export default {
               continue;
             }
 
-            // 如果条目尚未处理，发送到AI处理队列
+            // 如果条目尚未处理，准备发送到AI处理队列
             if (!wasAlreadyProcessed) {
-              await env.AI_PROCESSOR_QUEUE.send({
-                entryId: rssEntry.id,
-                sourceId: sourceId,
-                content: entry.content,
-              });
+              const message = QueueProducerService.createAiProcessMessage(
+                sourceId,
+                source.userId.toString(),
+                entry.content,
+                {
+                  entryId: rssEntry.id,
+                  title: entry.title,
+                  link: entry.link,
+                  guid: entry.guid,
+                  publishedAt: entry.publishedAt
+                }
+              );
+              messagesToSend.push(message);
             }
           } catch (entryError) {
             console.error(`处理RSS条目失败:`, entryError);
             // 继续处理下一个条目
           }
+        }
+
+        // 批量发送消息到AI处理队列
+        if (messagesToSend.length > 0) {
+          await queueProducer.sendBatch(messagesToSend);
+          console.log(`批量发送 ${messagesToSend.length} 条消息到AI处理队列`);
         }
       } catch (error) {
         console.error('处理RSS源时出错:', error);
