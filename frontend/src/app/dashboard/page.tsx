@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import NavigationMenu from '@/components/NavigationMenu';
+import RssSourceStatus from './components/RssSourceStatus';
 
 // 解析JWT令牌的函数
 const parseJwt = (token: string) => {
@@ -173,6 +174,11 @@ export default function DashboardPage() {
             <h2 className="text-xl font-semibold mb-4 text-gray-900">欢迎来到您的仪表板</h2>
             <p className="text-gray-800">您已成功登录系统。</p>
             {user && <p className="text-gray-800">当前用户: {user.email}</p>}
+            
+            {/* RSS源状态组件 */}
+            <div className="mt-8">
+              <RssSourceStatus />
+            </div>
             
             <div className="mt-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               <div className="bg-white rounded-lg shadow p-6">
