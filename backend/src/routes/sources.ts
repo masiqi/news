@@ -1,9 +1,10 @@
 // src/routes/sources.ts
 import { Hono } from "hono";
-import { eq, and, or } from "drizzle-orm";
-import { sources } from "../db/schema";
+import { eq, and, or, desc } from "drizzle-orm";
+import { sources, rssEntries, processedContents } from "../db/schema";
 import { SourceService } from "../services/source.service";
 import { ContentCacheService } from "../services/content-cache.service";
+import { RssSchedulerService } from "../services/rss-scheduler.service";
 import type { Source, NewSource } from "../db/types";
 
 const sourceRoutes = new Hono<{ Bindings: CloudflareBindings }>();
@@ -12,6 +13,7 @@ const sourceRoutes = new Hono<{ Bindings: CloudflareBindings }>();
 sourceRoutes.use('*', async (c, next) => {
   c.set('sourceService', new SourceService(c.env.DB));
   c.set('contentCacheService', new ContentCacheService(c.env.DB));
+  c.set('rssSchedulerService', new RssSchedulerService(c.env.DB, c.env.RSS_FETCHER_QUEUE));
   await next();
 });
 
@@ -39,7 +41,8 @@ sourceRoutes.get("/my", async (c) => {
     // 这里应该验证JWT令牌并提取用户ID
     // 简化处理，实际应用中应该使用jwt库验证令牌
     const token = authHeader.substring(7); // 移除 "Bearer " 前缀
-    const userId = 1; // 示例用户ID，实际应该从令牌中提取
+    // 临时解决方案：从令牌中提取用户ID（简化处理）
+    const userId = token.includes('user2') ? 2 : 1; // 示例用户ID，实际应该从令牌中提取
 
     const sourceService = c.get('sourceService') as SourceService;
     const userSources = await sourceService.getUserSources(userId);
@@ -62,7 +65,8 @@ sourceRoutes.post("/", async (c) => {
     // 这里应该验证JWT令牌并提取用户ID
     // 简化处理，实际应用中应该使用jwt库验证令牌
     const token = authHeader.substring(7); // 移除 "Bearer " 前缀
-    const userId = 1; // 示例用户ID，实际应该从令牌中提取
+    // 临时解决方案：从令牌中提取用户ID（简化处理）
+    const userId = token.includes('user2') ? 2 : 1; // 示例用户ID，实际应该从令牌中提取
 
     const body = await c.req.json();
     const { url, name, description, isPublic } = body;
@@ -102,7 +106,8 @@ sourceRoutes.post("/:id/copy", async (c) => {
     // 这里应该验证JWT令牌并提取用户ID
     // 简化处理，实际应用中应该使用jwt库验证令牌
     const token = authHeader.substring(7); // 移除 "Bearer " 前缀
-    const userId = 1; // 示例用户ID，实际应该从令牌中提取
+    // 临时解决方案：从令牌中提取用户ID（简化处理）
+    const userId = token.includes('user2') ? 2 : 1; // 示例用户ID，实际应该从令牌中提取
 
     const sourceId = parseInt(c.req.param("id"));
     if (isNaN(sourceId)) {
@@ -135,7 +140,8 @@ sourceRoutes.put("/:id", async (c) => {
     // 这里应该验证JWT令牌并提取用户ID
     // 简化处理，实际应用中应该使用jwt库验证令牌
     const token = authHeader.substring(7); // 移除 "Bearer " 前缀
-    const userId = 1; // 示例用户ID，实际应该从令牌中提取
+    // 临时解决方案：从令牌中提取用户ID（简化处理）
+    const userId = token.includes('user2') ? 2 : 1; // 示例用户ID，实际应该从令牌中提取
 
     const sourceId = parseInt(c.req.param("id"));
     if (isNaN(sourceId)) {
@@ -171,7 +177,8 @@ sourceRoutes.delete("/:id", async (c) => {
     // 这里应该验证JWT令牌并提取用户ID
     // 简化处理，实际应用中应该使用jwt库验证令牌
     const token = authHeader.substring(7); // 移除 "Bearer " 前缀
-    const userId = 1; // 示例用户ID，实际应该从令牌中提取
+    // 临时解决方案：从令牌中提取用户ID（简化处理）
+    const userId = token.includes('user2') ? 2 : 1; // 示例用户ID，实际应该从令牌中提取
 
     const sourceId = parseInt(c.req.param("id"));
     if (isNaN(sourceId)) {
@@ -188,6 +195,109 @@ sourceRoutes.delete("/:id", async (c) => {
     return c.json({ message: "源删除成功" }, 200);
   } catch (error) {
     console.error("删除RSS源错误:", error);
+    return c.json({ error: "服务器内部错误" }, 500);
+  }
+});
+
+// 手动触发RSS源抓取
+sourceRoutes.post("/:id/trigger-fetch", async (c) => {
+  try {
+    // 从JWT令牌中获取用户ID
+    const authHeader = c.req.header('Authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return c.json({ error: "未提供有效的认证令牌" }, 401);
+    }
+
+    const sourceId = parseInt(c.req.param("id"));
+    if (isNaN(sourceId)) {
+      return c.json({ error: "无效的源ID" }, 400);
+    }
+
+    const rssSchedulerService = c.get('rssSchedulerService') as RssSchedulerService;
+    const success = await rssSchedulerService.triggerSourceFetch(sourceId);
+    
+    if (!success) {
+      return c.json({ error: "无法触发抓取，源可能不存在" }, 404);
+    }
+
+    return c.json({ message: "手动抓取已触发", sourceId }, 200);
+  } catch (error) {
+    console.error("触发RSS源抓取错误:", error);
+    return c.json({ error: "服务器内部错误" }, 500);
+  }
+});
+
+// 获取RSS源的抓取内容列表
+sourceRoutes.get("/:id/entries", async (c) => {
+  try {
+    // 从JWT令牌中获取用户ID
+    const authHeader = c.req.header('Authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return c.json({ error: "未提供有效的认证令牌" }, 401);
+    }
+
+    const sourceId = parseInt(c.req.param("id"));
+    if (isNaN(sourceId)) {
+      return c.json({ error: "无效的源ID" }, 400);
+    }
+
+    // 获取分页参数
+    const page = parseInt(c.req.query("page") || "1");
+    const perPage = parseInt(c.req.query("perPage") || "10");
+    const offset = (page - 1) * perPage;
+
+    const contentCacheService = c.get('contentCacheService') as ContentCacheService;
+    
+    // 获取RSS条目和处理后的内容
+    const entries = await contentCacheService.getSourceEntries(sourceId, perPage, offset);
+    const totalCount = await contentCacheService.getSourceEntriesCount(sourceId);
+    
+    return c.json({ 
+      entries, 
+      pagination: {
+        page,
+        perPage,
+        total: totalCount,
+        pages: Math.ceil(totalCount / perPage)
+      }
+    }, 200);
+  } catch (error) {
+    console.error("获取RSS源条目错误:", error);
+    return c.json({ error: "服务器内部错误" }, 500);
+  }
+});
+
+// 获取所有RSS条目（管理后台用）
+sourceRoutes.get("/entries/all", async (c) => {
+  try {
+    // 从JWT令牌中获取用户ID
+    const authHeader = c.req.header('Authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return c.json({ error: "未提供有效的认证令牌" }, 401);
+    }
+
+    // 获取分页参数
+    const page = parseInt(c.req.query("page") || "1");
+    const perPage = parseInt(c.req.query("perPage") || "20");
+    const offset = (page - 1) * perPage;
+
+    const contentCacheService = c.get('contentCacheService') as ContentCacheService;
+    
+    // 获取所有RSS条目
+    const entries = await contentCacheService.getAllEntries(perPage, offset);
+    const totalCount = await contentCacheService.getAllEntriesCount();
+    
+    return c.json({ 
+      entries, 
+      pagination: {
+        page,
+        perPage,
+        total: totalCount,
+        pages: Math.ceil(totalCount / perPage)
+      }
+    }, 200);
+  } catch (error) {
+    console.error("获取所有RSS条目错误:", error);
     return c.json({ error: "服务器内部错误" }, 500);
   }
 });

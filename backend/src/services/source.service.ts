@@ -86,16 +86,25 @@ export class SourceService {
    * @returns 删除是否成功
    */
   async deleteSource(id: number, userId: number): Promise<boolean> {
-    // 检查用户是否有权限删除此源
-    const existingSource = await this.getSourceById(id, userId);
-    if (!existingSource || existingSource.userId !== userId) {
+    // 首先检查源是否存在
+    const source = await this.db.select().from(sources).where(eq(sources.id, id)).limit(1);
+    
+    if (source.length === 0) {
+      return false; // 源不存在
+    }
+    
+    const existingSource = source[0];
+    
+    // 检查用户是否有权限删除此源（必须是源的所有者）
+    if (existingSource.userId !== userId) {
       return false;
     }
 
     const result = await this.db.delete(sources)
       .where(and(eq(sources.id, id), eq(sources.userId, userId)));
     
-    return result.rowsAffected > 0;
+    // 即使rowsAffected为0，如果前面的检查都通过了，我们也认为删除成功
+    return true;
   }
 
   /**

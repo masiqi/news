@@ -3,6 +3,7 @@
 	"type": "module",
 	"scripts": {
 		"dev": "wrangler dev",
+		"dev:scheduler": "wrangler dev --config wrangler-rss-scheduler.jsonc",
 		"deploy": "wrangler deploy --minify",
 		"cf-typegen": "wrangler types --env-interface CloudflareBindings"
 	},
@@ -14,7 +15,8 @@
 		"rss-parser": "^3.13.0"
 	},
 	"devDependencies": {
+		"@cloudflare/workers-types": "^4.20250906.0",
 		"drizzle-kit": "^0.31.4",
-		"wrangler": "^4.33.2"
+		"wrangler": "^4.34.0"
 	}
 }

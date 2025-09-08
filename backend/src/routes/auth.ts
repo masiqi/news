@@ -198,6 +198,55 @@ authRoutes.post("/login", async (c) => {
   }
 });
 
+// 管理员登录端点
+authRoutes.post("/admin-login", async (c) => {
+  try {
+    const { username, password } = await c.req.json();
+
+    // 验证输入
+    if (!username || !password) {
+      return c.json({ error: "用户名和密码是必填项" }, 400);
+    }
+
+    // 从环境变量获取管理员凭证
+    const adminUsername = c.env.ADMIN_USERNAME || 'admin';
+    const adminPassword = c.env.ADMIN_PASSWORD || 'admin123';
+
+    // 验证管理员凭证
+    if (username !== adminUsername || password !== adminPassword) {
+      return c.json({ error: "用户名或密码错误" }, 401);
+    }
+
+    // 生成管理员JWT令牌
+    const payload = {
+      id: 0, // 管理员ID为0
+      username: username,
+      isAdmin: true
+    };
+
+    // 使用环境变量中的JWT密钥
+    const secret = c.env.JWT_SECRET;
+    if (!secret) {
+      console.error("JWT_SECRET环境变量未配置");
+      return c.json({ error: "服务器配置错误" }, 500);
+    }
+    const token = jwt.sign(payload, secret, { expiresIn: "24h" });
+
+    return c.json({ 
+      message: "管理员登录成功",
+      token,
+      user: { 
+        id: 0,
+        username: username,
+        isAdmin: true
+      } 
+    }, 200);
+  } catch (error) {
+    console.error("管理员登录错误:", error);
+    return c.json({ error: "服务器内部错误" }, 500);
+  }
+});
+
 // 登出端点
 authRoutes.post("/logout", async (c) => {
   try {
