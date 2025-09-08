@@ -77,3 +77,43 @@ export const syncCredentials = sqliteTable('sync_credentials', {
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
   expiresAt: integer('expires_at', { mode: 'timestamp' }).notNull(),
 });
+
+// 队列处理状态跟踪表
+export const processingStatuses = sqliteTable('processing_statuses', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  messageId: text('message_id').notNull().unique(),
+  status: text('status').notNull().$type<'pending' | 'processing' | 'completed' | 'failed'>(),
+  userId: integer('user_id').notNull().references(() => users.id),
+  sourceId: integer('source_id').notNull().references(() => sources.id),
+  error: text('error_message'),
+  startedAt: integer('started_at', { mode: 'timestamp' }),
+  completedAt: integer('completed_at', { mode: 'timestamp' }),
+  retryCount: integer('retry_count').default(0).notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
+});
+
+// 队列消息历史记录表
+export const messageHistories = sqliteTable('message_histories', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  messageId: text('message_id').notNull(),
+  status: text('status').notNull().$type<'queued' | 'processing' | 'completed' | 'failed' | 'retried' | 'dead_letter'>(),
+  timestamp: integer('timestamp', { mode: 'timestamp' }).notNull(),
+  error: text('error_message'),
+  retryCount: integer('retry_count').default(0).notNull(),
+  processingTime: integer('processing_time'), // 处理时间（毫秒）
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+});
+
+// 队列统计信息表
+export const queueStats = sqliteTable('queue_stats', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  queueName: text('queue_name').notNull(),
+  pendingMessages: integer('pending_messages').default(0).notNull(),
+  processingMessages: integer('processing_messages').default(0).notNull(),
+  failedMessages: integer('failed_messages').default(0).notNull(),
+  deadLetterMessages: integer('dead_letter_messages').default(0).notNull(),
+  averageProcessingTime: integer('average_processing_time').default(0).notNull(),
+  lastUpdated: integer('last_updated', { mode: 'timestamp' }).notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+});
