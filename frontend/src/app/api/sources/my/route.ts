@@ -3,8 +3,19 @@ import { NextRequest } from 'next/server';
 
 export async function GET(request: NextRequest) {
   try {
-    // 从cookie中获取JWT令牌
-    const token = request.cookies.get('token')?.value;
+    // 从Authorization头或cookie中获取JWT令牌
+    let token: string | undefined;
+    
+    // 首先检查Authorization头
+    const authHeader = request.headers.get('Authorization');
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      token = authHeader.substring(7); // 移除 "Bearer " 前缀
+    } 
+    
+    // 如果Authorization头中没有令牌，则检查cookie
+    if (!token) {
+      token = request.cookies.get('token')?.value;
+    }
     
     if (!token) {
       return new Response(

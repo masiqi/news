@@ -1,0 +1,12 @@
+{
+  "development": {
+    "backendHost": "10.1.0.241",
+    "backendPort": 8787,
+    "adminPort": 8000
+  },
+  "production": {
+    "backendHost": "10.1.0.241",
+    "backendPort": 8787,
+    "adminPort": 8000
+  }
+}
