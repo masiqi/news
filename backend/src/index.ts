@@ -7,6 +7,7 @@ import userRoutes from "./routes/users";
 import systemRoutes from "./routes/system";
 import topicsRoutes from "./routes/topics";
 import webContentRoutes from "./routes/web-content";
+import adminRoutes from "./routes/admin";
 // 移除测试路由导入
 import llmExtractorRoutes from "./services/llm-extractor";
 import llmContentExtractorRoutes from "./services/llm-content-extractor";
@@ -35,6 +36,9 @@ app.route("/auth", authRoutes);
 
 // 注册RSS源路由
 app.route("/sources", sourceRoutes);
+n// 注册用户引导API路由
+app.route("/onboarding", onboardingRoutes);
+
 
 // 注册用户路由
 app.route("/users", userRoutes);
@@ -47,6 +51,9 @@ app.route("/topics", topicsRoutes);
 
 // 注册网页内容路由
 app.route("/web-content", webContentRoutes);
+
+// 注册管理员API路由
+app.route("/admin", adminRoutes);
 
 // 移除测试路由注册
 
@@ -272,3 +279,14 @@ export default {
   fetch: app.fetch.bind(app),
   queue: queue
 };
+
+// 注册用户引导API路由
+app.route("/onboarding", onboardingRoutes);
+
+// 注册用户引导API路由
+
+
+// 注册状态管理API路由  
+app.route("/status", statusRoutes);
+// 注册通知管理API路由  
+app.route("/notifications", notificationRoutes);
