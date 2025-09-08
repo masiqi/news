@@ -1,0 +1,21 @@
+# 开发环境变量配置文件
+# 复制此文件为 .dev.vars 并设置实际的环境变量值
+
+# 智谱AI API Key (必需)
+# 从 https://bigmodel.cn/usercenter/proj-mgmt/apikeys 获取
+ZHIPUAI_API_KEY=your_zhipuai_api_key_here
+
+# JWT密钥 (用于API认证)
+JWT_SECRET=your_jwt_secret_here
+
+# 管理员用户名 (用于后台管理)
+ADMIN_USERNAME=admin
+
+# 管理员密码 (用于后台管理)  
+ADMIN_PASSWORD=admin123
+
+# 注意事项:
+# 1. ZHIPUAI_API_KEY 是必需的，没有它LLM功能将无法工作
+# 2. 请妥善保管API Key，不要提交到版本控制系统
+# 3. 生产环境请使用不同的API Key
+# 4. 此文件仅用于开发环境，生产环境请使用Cloudflare Workers的环境变量配置
