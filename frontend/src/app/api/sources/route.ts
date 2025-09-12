@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const response = await fetch(`${process.env.BACKEND_URL}/sources`, {
+    const response = await fetch(`${process.env.BACKEND_URL}/sources/my`, {
       headers: {
         'Authorization': `Bearer ${user.token}`,
         'Content-Type': 'application/json',

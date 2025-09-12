@@ -1,4 +1,4 @@
-import { db } from '../index';
+import { initDB } from '../../db/index';
 import { sources, sourceCategories, interestCategories, sourceTags } from '../../db/schema';
 import { eq, and, or, inArray, desc, asc, sql } from 'drizzle-orm';
 import { OnboardingService, InterestInput } from './onboarding.service';
@@ -32,9 +32,11 @@ export interface RecommendedSource {
 
 export class RecommendationService {
   private onboardingService: OnboardingService;
+  private db: any;
 
-  constructor() {
-    this.onboardingService = new OnboardingService();
+  constructor(db?: any) {
+    this.db = db;
+    this.onboardingService = new OnboardingService(db);
   }
 
   /**
@@ -74,7 +76,7 @@ export class RecommendationService {
     overallScore: number;
   }> {
     try {
-      const sourceResults = await db
+      const sourceResults = await this.db
         .select()
         .from(sources)
         .where(eq(sources.id, sourceId))
@@ -136,7 +138,7 @@ export class RecommendationService {
    */
   private async getSourcesByCategories(categoryIds: number[], interestWeights: Record<number, number>): Promise<any[]> {
     // 获取直接关联的源
-    const directSources = await db
+    const directSources = await this.db
       .select({
         id: sources.id,
         name: sources.name,
@@ -161,7 +163,7 @@ export class RecommendationService {
       );
 
     // 获取标签关联的源
-    const tagSources = await db
+    const tagSources = await this.db
       .select({
         id: sources.id,
         name: sources.name,
@@ -274,7 +276,7 @@ export class RecommendationService {
       }
 
       // 获取用户已订阅的分类
-      const userCategoryIds = await db
+      const userCategoryIds = await this.db
         .select({ categoryId: sourceCategories.id })
         .from(sourceCategoryRelations)
         .innerJoin(sources, eq(sources.id, sourceCategoryRelations.sourceId))
@@ -305,7 +307,7 @@ export class RecommendationService {
   private async calculateRelevanceScore(sourceId: number): Promise<number> {
     try {
       // 获取源的分类和标签
-      const [source] = await db
+      const [source] = await this.db
         .select({
           id: sources.id,
         })
@@ -415,7 +417,7 @@ export class RecommendationService {
    */
   async getTrendingRecommendedSources(limit: number = 10): Promise<RecommendedSource[]> {
     try {
-      const trendingSources = await db
+      const trendingSources = await this.db
         .select({
           id: sources.id,
           name: sources.name,
@@ -457,7 +459,7 @@ export class RecommendationService {
    */
   async getRecommendationsByCategory(categoryId: number, limit: number = 20): Promise<RecommendedSource[]> {
     try {
-      const sources = await db
+      const sources = await this.db
         .select({
           id: sources.id,
           name: sources.name,
@@ -518,7 +520,7 @@ export class RecommendationService {
       }
 
       // TODO: 将权重保存到配置表
-      // await db.insert(recommendationWeights).values({
+      // await this.db.insert(recommendationWeights).values({
       //   ...weights,
       //   updatedAt: new Date(),
       // });

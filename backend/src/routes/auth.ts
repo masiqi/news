@@ -90,7 +90,8 @@ authRoutes.post("/register", async (c) => {
     const newUser = await db.insert(users).values({
       email,
       passwordHash: hashedPassword,
-      createdAt: new Date()
+      createdAt: new Date(),
+      updatedAt: new Date()
     }).returning();
 
     // 获取创建的用户（注意：D1的RETURNING可能不返回完整数据）

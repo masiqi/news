@@ -1,4 +1,4 @@
-import { db } from '../index';
+import { initDB } from '../../db/index';
 import { sources, sourceCategories, sourceTags, sourceCategoryRelations, sourceTagRelations } from '../../db/schema';
 import { eq, and, inArray, or, like, desc, asc, isNull, lte, sql } from 'drizzle-orm';
 
@@ -21,11 +21,18 @@ export interface SourceStateUpdate {
 }
 
 export class SourceStateService {
+  constructor(private db: any = null) {}
+
   /**
    * 更新推荐源状态
    */
-  async updateSourceState(sourceId: number, updates: SourceStateUpdate, updatedBy?: number): Promise<typeof sources.$inferSelect | null> {
+  async updateSourceState(sourceId: number, updates: SourceStateUpdate, updatedBy?: number, dbConnection?: any): Promise<typeof sources.$inferSelect | null> {
     try {
+      const database = dbConnection || this.db;
+      if (!database) {
+        throw new Error('Database connection not provided');
+      }
+
       const updateData: any = {
         ...updates,
         recommendedBy: updatedBy,
@@ -38,7 +45,7 @@ export class SourceStateService {
         updateData.qualityLastValidatedAt = new Date();
       }
 
-      const [updatedSource] = await db
+      const [updatedSource] = await database
         .update(sources)
         .set(updateData)
         .where(eq(sources.id, sourceId))
@@ -53,8 +60,13 @@ export class SourceStateService {
   /**
    * 批量更新推荐源状态
    */
-  async batchUpdateSourceStates(sourceIds: number[], updates: SourceStateUpdate, updatedBy?: number): Promise<typeof sources.$inferSelect[]> {
+  async batchUpdateSourceStates(sourceIds: number[], updates: SourceStateUpdate, updatedBy?: number, dbConnection?: any): Promise<typeof sources.$inferSelect[]> {
     try {
+      const database = dbConnection || this.db;
+      if (!database) {
+        throw new Error('Database connection not provided');
+      }
+
       const updateData: any = {
         ...updates,
         recommendedBy: updatedBy,
@@ -67,7 +79,7 @@ export class SourceStateService {
         updateData.qualityLastValidatedAt = new Date();
       }
 
-      const updatedSources = await db
+      const updatedSources = await database
         .update(sources)
         .set(updateData)
         .where(inArray(sources.id, sourceIds))
@@ -82,7 +94,7 @@ export class SourceStateService {
   /**
    * 获取推荐源列表
    */
-  async getRecommendedSources(options: SourceFilterOptions = {}): Promise<{
+  async getRecommendedSources(options: SourceFilterOptions = {}, dbConnection?: any): Promise<{
     sources: typeof sources.$inferSelect[];
     total: number;
     page: number;
@@ -99,6 +111,11 @@ export class SourceStateService {
       page = 1,
       limit = 20,
     } = options;
+
+    const database = dbConnection || this.db;
+    if (!database) {
+      throw new Error('Database connection not provided');
+    }
 
     const offset = (page - 1) * limit;
     let whereConditions = [eq(sources.isRecommended, isRecommended)];
@@ -141,7 +158,7 @@ export class SourceStateService {
     }
 
     // 获取总数
-    const [countResult] = await db
+    const [countResult] = await database
       .select({ count: sql`count(*)` })
       .from(sources)
       .where(and(...whereConditions));
@@ -174,7 +191,7 @@ export class SourceStateService {
   /**
    * 获取推荐源统计信息
    */
-  async getRecommendedSourcesStatistics(): Promise<{
+  async getRecommendedSourcesStatistics(dbConnection?: any): Promise<{
     total: number;
     byLevel: Record<'basic' | 'premium' | 'featured', number>;
     byStatus: Record<'pending' | 'approved' | 'rejected', number>;
@@ -182,8 +199,13 @@ export class SourceStateService {
     totalSubscribers: number;
   }> {
     try {
+      const database = dbConnection || this.db;
+      if (!database) {
+        throw new Error('Database connection not provided');
+      }
+
       // 获取所有推荐源
-      const allSources = await db
+      const allSources = await database
         .select()
         .from(sources)
         .where(eq(sources.isRecommended, true));
@@ -231,8 +253,8 @@ export class SourceStateService {
   /**
    * 启用/禁用推荐源
    */
-  async toggleSourceRecommendation(sourceId: number, isRecommended: boolean, updatedBy?: number): Promise<typeof sources.$inferSelect | null> {
-    return await this.updateSourceState(sourceId, { isRecommended }, updatedBy);
+  async toggleSourceRecommendation(sourceId: number, isRecommended: boolean, updatedBy?: number, dbConnection?: any): Promise<typeof sources.$inferSelect | null> {
+    return await this.updateSourceState(sourceId, { isRecommended }, updatedBy, dbConnection);
   }
 
   /**
@@ -241,9 +263,10 @@ export class SourceStateService {
   async updateRecommendationLevel(
     sourceId: number, 
     level: 'basic' | 'premium' | 'featured',
-    updatedBy?: number
+    updatedBy?: number,
+    dbConnection?: any
   ): Promise<typeof sources.$inferSelect | null> {
-    return await this.updateSourceState(sourceId, { recommendationLevel: level }, updatedBy);
+    return await this.updateSourceState(sourceId, { recommendationLevel: level }, updatedBy, dbConnection);
   }
 
   /**
@@ -253,7 +276,8 @@ export class SourceStateService {
     sourceId: number, 
     status: 'pending' | 'approved' | 'rejected',
     notes?: string,
-    validatedBy?: number
+    validatedBy?: number,
+    dbConnection?: any
   ): Promise<typeof sources.$inferSelect | null> {
     return await this.updateSourceState(
       sourceId, 
@@ -261,15 +285,21 @@ export class SourceStateService {
         validationStatus: status, 
         validationNotes: notes 
       }, 
-      validatedBy
+      validatedBy,
+      dbConnection
     );
   }
 
   /**
    * 获取状态为待审核的推荐源
    */
-  async getPendingValidationSources(): Promise<typeof sources.$inferSelect[]> {
-    return await db
+  async getPendingValidationSources(dbConnection?: any): Promise<typeof sources.$inferSelect[]> {
+    const database = dbConnection || this.db;
+    if (!database) {
+      throw new Error('Database connection not provided');
+    }
+
+    return await database
       .select()
       .from(sources)
       .where(
@@ -284,11 +314,16 @@ export class SourceStateService {
   /**
    * 获取即将过期或需要重新验证的推荐源
    */
-  async getSourcesNeedingRevalidation(daysThreshold: number = 7): Promise<typeof sources.$inferSelect[]> {
+  async getSourcesNeedingRevalidation(daysThreshold: number = 7, dbConnection?: any): Promise<typeof sources.$inferSelect[]> {
+    const database = dbConnection || this.db;
+    if (!database) {
+      throw new Error('Database connection not provided');
+    }
+
     const thresholdDate = new Date();
     thresholdDate.setDate(thresholdDate.getDate() - daysThreshold);
 
-    return await db
+    return await database
       .select()
       .from(sources)
       .where(

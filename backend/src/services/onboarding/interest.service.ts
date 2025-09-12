@@ -1,6 +1,6 @@
-import { db } from '../index';
-import { interestCategories, userInterests, sources } from '../../db/schema';
-import { eq, and, or, inArray, desc, asc, sql } from 'drizzle-orm';
+import { initDB } from '../../db/index';
+import { interestCategories, userInterests, sources, sourceCategoryRelations, sourceTagRelations } from '../../db/schema';
+import { eq, and, or, inArray, desc, asc, sql, like, isNull, gte } from 'drizzle-orm';
 
 export interface InterestCategory {
   id: number;
@@ -34,12 +34,19 @@ export interface InterestWithStats extends InterestCategory {
 }
 
 export class InterestService {
+  constructor(private db: any = null) {}
+
   /**
    * 获取所有兴趣分类
    */
-  async getAllCategories(): Promise<InterestCategory[]> {
+  async getAllCategories(dbConnection?: any): Promise<InterestCategory[]> {
     try {
-      const categories = await db
+      const database = dbConnection || this.db;
+      if (!database) {
+        throw new Error('Database connection not provided');
+      }
+
+      const categories = await database
         .select()
         .from(interestCategories)
         .where(eq(interestCategories.isActive, true))
@@ -94,9 +101,14 @@ export class InterestService {
   /**
    * 获取用户兴趣
    */
-  async getUserInterests(userId: number): Promise<(UserInterest & { category?: InterestCategory })[]> {
+  async getUserInterests(userId: number, dbConnection?: any): Promise<(UserInterest & { category?: InterestCategory })[]> {
     try {
-      const interests = await db
+      const database = dbConnection || this.db;
+      if (!database) {
+        throw new Error('Database connection not provided');
+      }
+
+      const interests = await database
         .select({
           id: userInterests.id,
           userId: userInterests.userId,
@@ -123,9 +135,14 @@ export class InterestService {
   /**
    * 保存用户兴趣
    */
-  async saveUserInterests(userId: number, interests: { categoryId: number; level: 'low' | 'medium' | 'high' }[]): Promise<void> {
+  async saveUserInterests(userId: number, interests: { categoryId: number; level: 'low' | 'medium' | 'high' }[], dbConnection?: any): Promise<void> {
     try {
-      await db.transaction(async (tx) => {
+      const database = dbConnection || this.db;
+      if (!database) {
+        throw new Error('Database connection not provided');
+      }
+
+      await database.transaction(async (tx) => {
         // 停用用户现有的兴趣
         await tx
           .update(userInterests)
@@ -165,11 +182,16 @@ export class InterestService {
   /**
    * 更新用户兴趣
    */
-  async updateUserInterest(userId: number, interestId: number, level: 'low' | 'medium' | 'high'): Promise<UserInterest> {
+  async updateUserInterest(userId: number, interestId: number, level: 'low' | 'medium' | 'high', dbConnection?: any): Promise<UserInterest> {
     try {
+      const database = dbConnection || this.db;
+      if (!database) {
+        throw new Error('Database connection not provided');
+      }
+
       const priority = level === 'high' ? 8 : level === 'medium' ? 5 : 3;
       
-      const [updatedInterest] = await db
+      const [updatedInterest] = await database
         .update(userInterests)
         .set({
           level,
@@ -198,9 +220,14 @@ export class InterestService {
   /**
    * 删除用户兴趣
    */
-  async deleteUserInterest(userId: number, interestId: number): Promise<void> {
+  async deleteUserInterest(userId: number, interestId: number, dbConnection?: any): Promise<void> {
     try {
-      await db
+      const database = dbConnection || this.db;
+      if (!database) {
+        throw new Error('Database connection not provided');
+      }
+
+      await database
         .update(userInterests)
         .set({ 
           isActive: false,
@@ -223,9 +250,14 @@ export class InterestService {
   /**
    * 获取热门分类
    */
-  async getPopularCategories(limit: number = 10): Promise<InterestWithStats[]> {
+  async getPopularCategories(limit: number = 10, dbConnection?: any): Promise<InterestWithStats[]> {
     try {
-      const categories = await db
+      const database = dbConnection || this.db;
+      if (!database) {
+        throw new Error('Database connection not provided');
+      }
+
+      const categories = await database
         .select({
           id: interestCategories.id,
           name: interestCategories.name,
@@ -273,15 +305,20 @@ export class InterestService {
   /**
    * 获取分类统计
    */
-  async getCategoryStatistics(categoryId: number): Promise<{
+  async getCategoryStatistics(categoryId: number, dbConnection?: any): Promise<{
     userCount: number;
     averagePriority: number;
     relatedSourcesCount: number;
     popularityTrend: 'increasing' | 'decreasing' | 'stable';
   }> {
     try {
+      const database = dbConnection || this.db;
+      if (!database) {
+        throw new Error('Database connection not provided');
+      }
+
       // 获取用户数量和平均优先级
-      const [stats] = await db
+      const [stats] = await database
         .select({
           userCount: sql`count(*)`.mapWith(Number),
           averagePriority: sql`avg(${userInterests.priority})`.mapWith(Number),
@@ -290,7 +327,7 @@ export class InterestService {
         .where(eq(userInterests.categoryId, categoryId));
 
       // 获取相关源数量
-      const [sourceStats] = await db
+      const [sourceStats] = await database
         .select({ count: sql`count(*)`.mapWith(Number) })
         .from(sources)
         .innerJoin(sourceCategoryRelations, eq(sourceCategoryRelations.sourceId, sources.id))
@@ -314,9 +351,14 @@ export class InterestService {
   /**
    * 搜索分类
    */
-  async searchCategories(query: string): Promise<InterestCategory[]> {
+  async searchCategories(query: string, dbConnection?: any): Promise<InterestCategory[]> {
     try {
-      const categories = await db
+      const database = dbConnection || this.db;
+      if (!database) {
+        throw new Error('Database connection not provided');
+      }
+
+      const categories = await database
         .select()
         .from(interestCategories)
         .where(
@@ -347,7 +389,7 @@ export class InterestService {
   async getRecommendedCategories(userId: number, limit: number = 8): Promise<InterestCategory[]> {
     try {
       // 获取用户已有的兴趣分类
-      const userCategories = await db
+      const userCategories = await this.db
         .select({ categoryId: userInterests.categoryId })
         .from(userInterests)
         .where(and(eq(userInterests.userId, userId), eq(userInterests.isActive, true)));
@@ -355,7 +397,7 @@ export class InterestService {
       const excludedCategoryIds = userCategories.map(uc => uc.categoryId);
       
       // 获取同级或相关分类
-      const recommendedCategories = await db
+      const recommendedCategories = await this.db
         .select()
         .from(interestCategories)
         .where(
@@ -369,7 +411,7 @@ export class InterestService {
               inArray(
                 interestCategories.parentId,
                 userCategories.map(uc => {
-                  const [category] = await db
+                  const [category] = await this.db
                     .select({ parentId: interestCategories.parentId })
                     .from(interestCategories)
                     .where(eq(interestCategories.id, uc.categoryId))
@@ -397,13 +439,18 @@ export class InterestService {
   /**
    * 更新分类排序
    */
-  async updateCategoryOrder(categoryIds: number[], orders: number[]): Promise<void> {
+  async updateCategoryOrder(categoryIds: number[], orders: number[], dbConnection?: any): Promise<void> {
     try {
+      const database = dbConnection || this.db;
+      if (!database) {
+        throw new Error('Database connection not provided');
+      }
+
       if (categoryIds.length !== orders.length) {
         throw new Error('分类ID和排序数组长度不匹配');
       }
 
-      await db.transaction(async (tx) => {
+      await database.transaction(async (tx) => {
         for (let i = 0; i < categoryIds.length; i++) {
           await tx
             .update(interestCategories)
@@ -425,9 +472,14 @@ export class InterestService {
   /**
    * 验证分类名称是否可用
    */
-  async validateCategoryName(name: string, excludeId?: number): Promise<boolean> {
+  async validateCategoryName(name: string, excludeId?: number, dbConnection?: any): Promise<boolean> {
     try {
-      let query = db
+      const database = dbConnection || this.db;
+      if (!database) {
+        throw new Error('Database connection not provided');
+      }
+
+      let query = database
         .select({ id: interestCategories.id })
         .from(interestCategories)
         .where(eq(interestCategories.name, name));
@@ -447,13 +499,18 @@ export class InterestService {
   /**
    * 获取分类详情
    */
-  async getCategoryDetails(categoryId: number): Promise<(InterestCategory & {
+  async getCategoryDetails(categoryId: number, dbConnection?: any): Promise<(InterestCategory & {
     userCount: number;
     averagePriority: number;
     subcategories: InterestCategory[];
   }) | null> {
     try {
-      const [category] = await db
+      const database = dbConnection || this.db;
+      if (!database) {
+        throw new Error('Database connection not provided');
+      }
+
+      const [category] = await database
         .select()
         .from(interestCategories)
         .where(eq(interestCategories.id, categoryId))
@@ -464,7 +521,7 @@ export class InterestService {
       }
 
       // 获取统计信息
-      const [stats] = await db
+      const [stats] = await database
         .select({
           userCount: sql`count(*)`.mapWith(Number),
           averagePriority: sql`avg(${userInterests.priority})`.mapWith(Number),
@@ -473,7 +530,7 @@ export class InterestService {
         .where(eq(userInterests.categoryId, categoryId));
 
       // 获取子分类
-      const subcategories = await db
+      const subcategories = await database
         .select()
         .from(interestCategories)
         .where(

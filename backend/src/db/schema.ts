@@ -578,3 +578,207 @@ export const userSettings = sqliteTable('user_settings', {
   createdAtIdx: index('idx_user_settings_created_at').on(table.createdAt),
 }));
 
+// ================ 监控系统相关表 ================
+
+// 系统性能指标表
+export const systemMetrics = sqliteTable('system_metrics', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  timestamp: integer('timestamp', { mode: 'timestamp' }).notNull(),
+  service: text('service').notNull(), // 服务名称，如 'api', 'worker', 'database'
+  cpuUsage: integer('cpu_usage').notNull(), // CPU使用率 0-100
+  memoryUsage: integer('memory_usage').notNull(), // 内存使用量 MB
+  diskUsage: integer('disk_usage').notNull(), // 磁盘使用量 MB
+  networkIn: integer('network_in').notNull(), // 网络输入字节数
+  networkOut: integer('network_out').notNull(), // 网络输出字节数
+  responseTime: integer('response_time').notNull(), // 响应时间 ms
+  errorRate: integer('error_rate').notNull(), // 错误率 0-100
+  activeConnections: integer('active_connections').notNull(), // 活跃连接数
+  metadata: text('metadata'), // JSON格式存储其他元数据
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+}, (table) => ({
+  // 索引定义
+  timestampIdx: index('idx_system_metrics_timestamp').on(table.timestamp),
+  serviceIdx: index('idx_system_metrics_service').on(table.service),
+  cpuUsageIdx: index('idx_system_metrics_cpu_usage').on(table.cpuUsage),
+  memoryUsageIdx: index('idx_system_metrics_memory_usage').on(table.memoryUsage),
+  createdAtIdx: index('idx_system_metrics_created_at').on(table.createdAt),
+}));
+
+// 服务健康状态表
+export const serviceHealth = sqliteTable('service_health', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  serviceName: text('service_name').notNull().unique(),
+  status: text('status').notNull().$type<'healthy' | 'degraded' | 'unhealthy'>(),
+  lastCheck: integer('last_check', { mode: 'timestamp' }).notNull(),
+  responseTime: integer('response_time').notNull(), // 响应时间 ms
+  errorMessage: text('error_message'),
+  consecutiveFailures: integer('consecutive_failures').notNull().default(0),
+  uptime: integer('uptime').notNull(), // 运行时间秒数
+  lastFailure: integer('last_failure', { mode: 'timestamp' }),
+  recoveryTime: integer('recovery_time'), // 恢复时间 ms
+  checkInterval: integer('check_interval').notNull().default(60), // 检查间隔秒数
+  maxRetries: integer('max_retries').notNull().default(3),
+  isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
+}, (table) => ({
+  // 索引定义
+  serviceNameIdx: uniqueIndex('unq_service_health_service_name').on(table.serviceName),
+  statusIdx: index('idx_service_health_status').on(table.status),
+  lastCheckIdx: index('idx_service_health_last_check').on(table.lastCheck),
+  isActiveIdx: index('idx_service_health_is_active').on(table.isActive),
+  createdAtIdx: index('idx_service_health_created_at').on(table.createdAt),
+}));
+
+// 队列状态监控表
+export const queueStatus = sqliteTable('queue_status', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  queueName: text('queue_name').notNull().unique(),
+  pendingMessages: integer('pending_messages').notNull().default(0),
+  processingMessages: integer('processing_messages').notNull().default(0),
+  failedMessages: integer('failed_messages').notNull().default(0),
+  completedMessages: integer('completed_messages').notNull().default(0),
+  deadLetterMessages: integer('dead_letter_messages').notNull().default(0),
+  avgProcessingTime: integer('avg_processing_time').notNull().default(0), // 平均处理时间 ms
+  lastProcessed: integer('last_processed', { mode: 'timestamp' }),
+  throughput: integer('throughput').notNull().default(0), // 吞吐量 messages/min
+  maxRetries: integer('max_retries').notNull().default(3),
+  ttl: integer('ttl').notNull().default(86400), // 消息TTL秒数
+  isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true),
+  lastUpdated: integer('last_updated', { mode: 'timestamp' }).notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+}, (table) => ({
+  // 索引定义
+  queueNameIdx: uniqueIndex('unq_queue_status_queue_name').on(table.queueName),
+  isActiveIdx: index('idx_queue_status_is_active').on(table.isActive),
+  lastUpdatedIdx: index('idx_queue_status_last_updated').on(table.lastUpdated),
+  createdAtIdx: index('idx_queue_status_created_at').on(table.createdAt),
+}));
+
+// 用户活动统计表
+export const userActivityStats = sqliteTable('user_activity_stats', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  date: integer('date', { mode: 'timestamp' }).notNull(), // 统计日期
+  totalUsers: integer('total_users').notNull().default(0),
+  activeUsers: integer('active_users').notNull().default(0),
+  newUsers: integer('new_users').notNull().default(0),
+  sessionsCount: integer('sessions_count').notNull().default(0),
+  pageViews: integer('page_views').notNull().default(0),
+  avgSessionDuration: integer('avg_session_duration').notNull().default(0), // 平均会话时长秒数
+  topActions: text('top_actions'), // JSON格式存储热门操作
+  deviceStats: text('device_stats'), // JSON格式存储设备统计
+  browserStats: text('browser_stats'), // JSON格式存储浏览器统计
+  regionStats: text('region_stats'), // JSON格式存储地区统计
+  hourStats: text('hour_stats'), // JSON格式存储小时统计
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+}, (table) => ({
+  // 索引定义
+  dateIdx: uniqueIndex('unq_user_activity_stats_date').on(table.date),
+  totalUsersIdx: index('idx_user_activity_stats_total_users').on(table.totalUsers),
+  activeUsersIdx: index('idx_user_activity_stats_active_users').on(table.activeUsers),
+  createdAtIdx: index('idx_user_activity_stats_created_at').on(table.createdAt),
+}));
+
+// 报警规则表
+export const alertRules = sqliteTable('alert_rules', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  name: text('name').notNull(),
+  metric: text('metric').notNull(), // 监控指标，如 'cpu_usage', 'memory_usage', 'error_rate'
+  condition: text('condition').notNull().$type<'gt' | 'lt' | 'eq' | 'ne'>(), // 条件类型
+  threshold: integer('threshold').notNull(), // 阈值
+  duration: integer('duration').notNull().default(0), // 持续时间秒数，0表示立即触发
+  severity: text('severity').notNull().$type<'low' | 'medium' | 'high' | 'critical'>(), // 严重程度
+  enabled: integer('enabled', { mode: 'boolean' }).notNull().default(true),
+  notificationChannels: text('notification_channels').notNull(), // JSON格式存储通知渠道
+  description: text('description'), // 规则描述
+  cooldownPeriod: integer('cooldown_period').notNull().default(300), // 冷却时间秒数
+  maxNotifications: integer('max_notifications').notNull().default(10), // 最大通知次数
+  isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true),
+  createdBy: integer('created_by').references(() => users.id),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
+}, (table) => ({
+  // 索引定义
+  metricIdx: index('idx_alert_rules_metric').on(table.metric),
+  severityIdx: index('idx_alert_rules_severity').on(table.severity),
+  enabledIdx: index('idx_alert_rules_enabled').on(table.enabled),
+  isActiveIdx: index('idx_alert_rules_is_active').on(table.isActive),
+  createdByIdx: index('idx_alert_rules_created_by').on(table.createdBy),
+  createdAtIdx: index('idx_alert_rules_created_at').on(table.createdAt),
+}));
+
+// 报警记录表
+export const alertRecords = sqliteTable('alert_records', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  ruleId: integer('rule_id').notNull().references(() => alertRules.id, { onDelete: 'cascade' }),
+  triggeredAt: integer('triggered_at', { mode: 'timestamp' }).notNull(),
+  resolvedAt: integer('resolved_at', { mode: 'timestamp' }),
+  value: integer('value').notNull(), // 触发时的值
+  message: text('message').notNull(), // 报警消息
+  severity: text('severity').notNull().$type<'low' | 'medium' | 'high' | 'critical'>(),
+  status: text('status').notNull().$type<'active' | 'resolved'>(),
+  notificationsSent: text('notifications_sent').notNull(), // JSON格式存储已发送的通知
+  metadata: text('metadata'), // JSON格式存储其他元数据
+  acknowledgedBy: integer('acknowledged_by').references(() => users.id),
+  acknowledgedAt: integer('acknowledged_at', { mode: 'timestamp' }),
+  resolutionNote: text('resolution_note'), // 解决备注
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+}, (table) => ({
+  // 索引定义
+  ruleIdIdx: index('idx_alert_records_rule_id').on(table.ruleId),
+  statusIdx: index('idx_alert_records_status').on(table.status),
+  severityIdx: index('idx_alert_records_severity').on(table.severity),
+  triggeredAtIdx: index('idx_alert_records_triggered_at').on(table.triggeredAt),
+  acknowledgedByIdx: index('idx_alert_records_acknowledged_by').on(table.acknowledgedBy),
+  createdAtIdx: index('idx_alert_records_created_at').on(table.createdAt),
+}));
+
+// 监控数据聚合表（用于历史数据存储）
+export const monitoringAggregates = sqliteTable('monitoring_aggregates', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  metricType: text('metric_type').notNull(), // 指标类型
+  timeRange: text('time_range').notNull(), // 时间范围，如 '1h', '1d', '1w', '1m'
+  timestamp: integer('timestamp', { mode: 'timestamp' }).notNull(), // 聚合时间点
+  minValue: integer('min_value').notNull(),
+  maxValue: integer('max_value').notNull(),
+  avgValue: integer('avg_value').notNull(),
+  sumValue: integer('sum_value').notNull(),
+  count: integer('count').notNull(),
+  service: text('service'), // 服务名称（可选）
+  metadata: text('metadata'), // JSON格式存储其他元数据
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+}, (table) => ({
+  // 索引定义
+  metricTypeIdx: index('idx_monitoring_aggregates_metric_type').on(table.metricType),
+  timeRangeIdx: index('idx_monitoring_aggregates_time_range').on(table.timeRange),
+  timestampIdx: index('idx_monitoring_aggregates_timestamp').on(table.timestamp),
+  serviceIdx: index('idx_monitoring_aggregates_service').on(table.service),
+  createdAtIdx: index('idx_monitoring_aggregates_created_at').on(table.createdAt),
+  uniqueMetricTimeRangeIdx: uniqueIndex('unq_monitoring_aggregates_metric_time_range_timestamp').on(table.metricType, table.timeRange, table.timestamp),
+}));
+
+// 系统事件日志表
+export const systemEventLogs = sqliteTable('system_event_logs', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  eventType: text('event_type').notNull(), // 事件类型
+  eventName: text('event_name').notNull(), // 事件名称
+  service: text('service').notNull(), // 相关服务
+  level: text('level').notNull().$type<'info' | 'warning' | 'error' | 'debug'>(), // 日志级别
+  message: text('message').notNull(), // 事件消息
+  details: text('details'), // JSON格式存储详细信息
+  userId: integer('user_id').references(() => users.id), // 相关用户（可选）
+  ipAddress: text('ip_address'), // IP地址
+  userAgent: text('user_agent'), // 用户代理
+  timestamp: integer('timestamp', { mode: 'timestamp' }).notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+}, (table) => ({
+  // 索引定义
+  eventTypeIdx: index('idx_system_event_logs_event_type').on(table.eventType),
+  eventNameIdx: index('idx_system_event_logs_event_name').on(table.eventName),
+  serviceIdx: index('idx_system_event_logs_service').on(table.service),
+  levelIdx: index('idx_system_event_logs_level').on(table.level),
+  timestampIdx: index('idx_system_event_logs_timestamp').on(table.timestamp),
+  userIdIdx: index('idx_system_event_logs_user_id').on(table.userId),
+  createdAtIdx: index('idx_system_event_logs_created_at').on(table.createdAt),
+}));
+
