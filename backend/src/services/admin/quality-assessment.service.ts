@@ -1,4 +1,4 @@
-import { db } from '../index';
+import { initDB } from '../../db/index';
 import { sources, sourceValidationHistories } from '../../db/schema';
 import { eq, and, desc, gte, lte, or, isNull } from 'drizzle-orm';
 
@@ -25,13 +25,21 @@ export interface ValidationResult {
 }
 
 export class QualityAssessmentService {
+  constructor(private db: any = null) {}
+
   /**
    * 评估推荐源的质量
    */
-  async assessSourceQuality(sourceId: number): Promise<ValidationResult> {
+  async assessSourceQuality(sourceId: number, dbConnection?: any): Promise<ValidationResult> {
     try {
+      // 使用传入的数据库连接或实例的数据库连接
+      const database = dbConnection || this.db;
+      if (!database) {
+        throw new Error('Database connection not provided');
+      }
+
       // 获取源的基本信息
-      const [source] = await db
+      const [source] = await database
         .select()
         .from(sources)
         .where(eq(sources.id, sourceId));
@@ -195,9 +203,15 @@ export class QualityAssessmentService {
   async recordValidationHistory(
     result: ValidationResult,
     validationType: 'automatic' | 'manual',
-    validatedBy?: number
+    validatedBy?: number,
+    dbConnection?: any
   ): Promise<void> {
-    await db.insert(sourceValidationHistories).values({
+    const database = dbConnection || this.db;
+    if (!database) {
+      throw new Error('Database connection not provided');
+    }
+
+    await database.insert(sourceValidationHistories).values({
       sourceId: result.sourceId,
       validationType,
       availabilityScore: result.metrics.availability,
@@ -216,8 +230,13 @@ export class QualityAssessmentService {
   /**
    * 获取源的验证历史
    */
-  async getSourceValidationHistory(sourceId: number, limit: number = 10) {
-    return await db
+  async getSourceValidationHistory(sourceId: number, limit: number = 10, dbConnection?: any) {
+    const database = dbConnection || this.db;
+    if (!database) {
+      throw new Error('Database connection not provided');
+    }
+
+    return await database
       .select()
       .from(sourceValidationHistories)
       .where(eq(sourceValidationHistories.sourceId, sourceId))
@@ -228,19 +247,24 @@ export class QualityAssessmentService {
   /**
    * 批量验证推荐源
    */
-  async batchValidateSources(sourceIds: number[]): Promise<ValidationResult[]> {
+  async batchValidateSources(sourceIds: number[], dbConnection?: any): Promise<ValidationResult[]> {
+    const database = dbConnection || this.db;
+    if (!database) {
+      throw new Error('Database connection not provided');
+    }
+
     const results: ValidationResult[] = [];
 
     for (const sourceId of sourceIds) {
       try {
-        const result = await this.assessSourceQuality(sourceId);
+        const result = await this.assessSourceQuality(sourceId, database);
         results.push(result);
         
         // 记录验证历史
-        await this.recordValidationHistory(result, 'automatic');
+        await this.recordValidationHistory(result, 'automatic', undefined, database);
         
         // 更新源的质量信息
-        await this.updateSourceQualityMetrics(sourceId, result.metrics);
+        await this.updateSourceQualityMetrics(sourceId, result.metrics, database);
       } catch (error) {
         console.error(`Failed to validate source ${sourceId}:`, error);
       }
@@ -252,8 +276,13 @@ export class QualityAssessmentService {
   /**
    * 更新源的质量指标
    */
-  private async updateSourceQualityMetrics(sourceId: number, metrics: QualityMetrics): Promise<void> {
-    await db
+  private async updateSourceQualityMetrics(sourceId: number, metrics: QualityMetrics, dbConnection?: any): Promise<void> {
+    const database = dbConnection || this.db;
+    if (!database) {
+      throw new Error('Database connection not provided');
+    }
+
+    await database
       .update(sources)
       .set({
         qualityAvailability: metrics.availability,
@@ -269,10 +298,15 @@ export class QualityAssessmentService {
   /**
    * 获取需要验证的源
    */
-  async getSourcesNeedingValidation(maxAgeHours: number = 24): Promise<typeof sources.$inferSelect[]> {
+  async getSourcesNeedingValidation(maxAgeHours: number = 24, dbConnection?: any): Promise<typeof sources.$inferSelect[]> {
+    const database = dbConnection || this.db;
+    if (!database) {
+      throw new Error('Database connection not provided');
+    }
+
     const cutoffTime = new Date(Date.now() - maxAgeHours * 60 * 60 * 1000);
     
-    return await db
+    return await database
       .select()
       .from(sources)
       .where(

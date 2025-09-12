@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI资讯平台管理后台</title>
-    <link href="https://cdn.jsdelivr.net/npm/amis@1.10.2/sdk/sdk.css" rel="stylesheet"/>
-    <script src="https://cdn.jsdelivr.net/npm/amis@1.10.2/sdk/sdk.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/amis@6.13.0/sdk/sdk.css" rel="stylesheet"/>
+    <script src="https://cdn.jsdelivr.net/npm/amis@6.13.0/sdk/sdk.js"></script>
     <style>
         html, body {
             height: 100%;
@@ -34,15 +34,203 @@
 
         // 登出函数
         function logout() {
+            // 停止token过期检查
+            stopTokenExpiryCheck();
+            
+            // 清除localStorage中的认证信息
             localStorage.removeItem('admin_logged_in');
+            localStorage.removeItem('admin_token');
+            localStorage.removeItem('token_expiry');
+            
+            // 移除可能存在的过期提示弹窗
+            const expiredModal = document.getElementById('token-expired-modal');
+            if (expiredModal) {
+                expiredModal.remove();
+            }
+            
             renderLoginPage();
         }
 
-        // 全局fetcher配置，添加认证头
+        // JWT Token解析和验证函数
+        function parseJWT(token) {
+            try {
+                // JWT token由三部分组成，用点号分隔
+                const parts = token.split('.');
+                if (parts.length !== 3) {
+                    throw new Error('Invalid token format');
+                }
+                
+                // 解析payload部分（第二部分）
+                const payload = parts[1];
+                // Base64 URL解码
+                const base64Url = payload.replace(/-/g, '+').replace(/_/g, '/');
+                const base64 = base64Url.replace(/[^A-Za-z0-9+/]/g, '');
+                const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+                    return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+                }).join(''));
+                
+                return JSON.parse(jsonPayload);
+            } catch (error) {
+                console.error('JWT解析错误:', error);
+                return null;
+            }
+        }
+
+        // 检查token是否过期
+        function isTokenExpired(token) {
+            if (!token) {
+                return true;
+            }
+            
+            const decoded = parseJWT(token);
+            if (!decoded || !decoded.exp) {
+                return true;
+            }
+            
+            // exp是Unix时间戳（秒），转换为毫秒
+            const expiryTime = decoded.exp * 1000;
+            const currentTime = Date.now();
+            
+            // 提前5分钟判断为过期，给刷新留出时间
+            const bufferTime = 5 * 60 * 1000;
+            
+            return currentTime >= (expiryTime - bufferTime);
+        }
+
+        // 获取token剩余有效期（分钟）
+        function getTokenExpiryMinutes(token) {
+            if (!token) {
+                return 0;
+            }
+            
+            const decoded = parseJWT(token);
+            if (!decoded || !decoded.exp) {
+                return 0;
+            }
+            
+            const expiryTime = decoded.exp * 1000;
+            const currentTime = Date.now();
+            const remainingTime = expiryTime - currentTime;
+            
+            return Math.max(0, Math.floor(remainingTime / (60 * 1000)));
+        }
+
+        // 增强的登录状态检查，包含token过期检测
+        function isLoggedIn() {
+            const loggedIn = localStorage.getItem('admin_logged_in') === 'true';
+            const token = localStorage.getItem('admin_token');
+            
+            if (!loggedIn || !token) {
+                return false;
+            }
+            
+            // 检查token是否过期
+            if (isTokenExpired(token)) {
+                console.log('Token已过期，自动登出');
+                logout();
+                return false;
+            }
+            
+            return true;
+        }
+
+        // 显示token过期提醒
+        function showTokenExpiryWarning() {
+            const token = localStorage.getItem('admin_token');
+            if (!token) {
+                return;
+            }
+            
+            const remainingMinutes = getTokenExpiryMinutes(token);
+            
+            // 如果剩余时间少于30分钟，显示提醒
+            if (remainingMinutes > 0 && remainingMinutes <= 30) {
+                const warningDiv = document.createElement('div');
+                warningDiv.id = 'token-expiry-warning';
+                warningDiv.style.cssText = `
+                    position: fixed;
+                    top: 20px;
+                    right: 20px;
+                    background: #fff3cd;
+                    border: 1px solid #ffeaa7;
+                    color: #856404;
+                    padding: 12px 20px;
+                    border-radius: 6px;
+                    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+                    z-index: 9999;
+                    font-size: 14px;
+                    max-width: 300px;
+                `;
+                
+                warningDiv.innerHTML = `
+                    <div style="display: flex; align-items: center; justify-content: space-between;">
+                        <span>⚠️ 登录即将在 ${remainingMinutes} 分钟后过期</span>
+                        <button onclick="this.parentElement.parentElement.remove()" 
+                                style="background: none; border: none; font-size: 16px; cursor: pointer; margin-left: 10px;">×</button>
+                    </div>
+                `;
+                
+                // 避免重复添加
+                if (!document.getElementById('token-expiry-warning')) {
+                    document.body.appendChild(warningDiv);
+                    
+                    // 5分钟后自动移除提醒
+                    setTimeout(() => {
+                        const warning = document.getElementById('token-expiry-warning');
+                        if (warning) {
+                            warning.remove();
+                        }
+                    }, 5 * 60 * 1000);
+                }
+            }
+        }
+
+        // 处理401未授权响应（token过期或无效）
+        function handleUnauthorizedResponse() {
+            console.log('收到401未授权响应，token可能已过期');
+            
+            // 显示友好的过期提示
+            const expiryDiv = document.createElement('div');
+            expiryDiv.id = 'token-expired-modal';
+            expiryDiv.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0,0,0,0.5);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                z-index: 10000;
+            `;
+            
+            expiryDiv.innerHTML = `
+                <div style="background: white; padding: 30px; border-radius: 8px; text-align: center; max-width: 400px;">
+                    <h3 style="color: #dc3545; margin-top: 0;">🔒 登录已过期</h3>
+                    <p style="margin: 15px 0; color: #666;">您的登录已过期，请重新登录以继续使用管理后台。</p>
+                    <button onclick="logout(); this.closest('#token-expired-modal').remove();" 
+                            style="background: #007bff; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer;">
+                        重新登录
+                    </button>
+                </div>
+            `;
+            
+            document.body.appendChild(expiryDiv);
+        }
+
+        // 全局fetcher配置，添加认证头和401处理
         const fetcher = (config) => {
             console.log('Fetcher被调用，配置:', config);
-            // 添加认证头
+            
+            // 在发送请求前检查token是否过期
             const token = localStorage.getItem('admin_token');
+            if (token && isTokenExpired(token)) {
+                console.log('Token已过期，阻止API请求');
+                handleUnauthorizedResponse();
+                return Promise.reject(new Error('Token expired'));
+            }
+            
             console.log('从localStorage获取的令牌:', token);
             if (token) {
                 config.headers = config.headers || {};
@@ -61,6 +249,13 @@
                 })
                 .catch(error => {
                     console.error('API错误:', error);
+                    
+                    // 检查是否是401未授权错误
+                    if (error.response && error.response.status === 401) {
+                        console.log('收到401响应，处理token过期');
+                        handleUnauthorizedResponse();
+                    }
+                    
                     throw error;
                 });
         };
@@ -87,6 +282,18 @@
                                 // 登录成功，保存令牌
                                 localStorage.setItem('admin_logged_in', 'true');
                                 localStorage.setItem('admin_token', responseData.token);
+                                
+                                // 解析token并存储过期时间
+                                const decodedToken = parseJWT(responseData.token);
+                                if (decodedToken && decodedToken.exp) {
+                                    const expiryTime = decodedToken.exp * 1000; // 转换为毫秒
+                                    localStorage.setItem('token_expiry', expiryTime.toString());
+                                    console.log('Token过期时间:', new Date(expiryTime).toLocaleString());
+                                }
+                                
+                                // 启动token过期检查定时器
+                                startTokenExpiryCheck();
+                                
                                 // 重新渲染主页面
                                 setTimeout(() => {
                                     renderMainPage();
@@ -293,145 +500,586 @@
                 type: 'page',
                 title: '用户管理',
                 body: {
-                    type: 'crud',
+                    type: 'service',
                     api: {
                         method: 'get',
-                        url: '/api/users',
+                        url: '/admin/users/statistics',
                         headers: {
                             'Authorization': 'Bearer ' + localStorage.getItem('admin_token')
                         }
                     },
-                    defaultParams: {
-                        perPage: 10
-                    },
-                    pageField: 'page',
-                    perPageField: 'perPage',
-                    loadDataOnce: false, // 启用分页，一次性加载所有数据
-                    interval: 0, // 禁用轮询
-                    silentPolling: false, // 禁用静默轮询
-                    stopAutoRefreshWhen: 'true', // 始终停止自动刷新
-                    syncLocation: true, // 启用URL同步以支持分页
-                    columns: [
+                    body: [
                         {
-                            name: 'id',
-                            label: 'ID',
-                            type: 'text'
+                            type: 'grid',
+                            columns: [
+                                {
+                                    type: 'panel',
+                                    title: '用户总数',
+                                    body: {
+                                        type: 'tpl',
+                                        tpl: '<h2>${totalUsers}</h2><p>用户</p>'
+                                    }
+                                },
+                                {
+                                    type: 'panel',
+                                    title: '活跃用户',
+                                    body: {
+                                        type: 'tpl',
+                                        tpl: '<h2>${activeUsers}</h2><p>活跃</p>'
+                                    }
+                                },
+                                {
+                                    type: 'panel',
+                                    title: '待审核用户',
+                                    body: {
+                                        type: 'tpl',
+                                        tpl: '<h2>${pendingUsers}</h2><p>待审核</p>'
+                                    }
+                                },
+                                {
+                                    type: 'panel',
+                                    title: '近期注册',
+                                    body: {
+                                        type: 'tpl',
+                                        tpl: '<h2>${recentRegistrations}</h2><p>7天内</p>'
+                                    }
+                                }
+                            ]
                         },
                         {
-                            name: 'email',
-                            label: '邮箱',
-                            type: 'text'
-                        },
-                        {
-                            name: 'createdAt',
-                            label: '创建时间',
-                            type: 'datetime'
-                        },
-                        {
-                            type: 'operation',
-                            label: '操作',
-                            width: 160,
-                            buttons: [
+                            type: 'crud',
+                            api: {
+                                method: 'get',
+                                url: '/admin/users',
+                                headers: {
+                                    'Authorization': 'Bearer ' + localStorage.getItem('admin_token')
+                                }
+                            },
+                            defaultParams: {
+                                limit: 20
+                            },
+                            pageField: 'page',
+                            perPageField: 'limit',
+                            loadDataOnce: false,
+                            interval: 0,
+                            silentPolling: false,
+                            stopAutoRefreshWhen: 'true',
+                            syncLocation: true,
+                            columns: [
+                                {
+                                    name: 'id',
+                                    label: 'ID',
+                                    type: 'text',
+                                    width: 60
+                                },
+                                {
+                                    name: 'email',
+                                    label: '邮箱',
+                                    type: 'text',
+                                    width: 200
+                                },
+                                {
+                                    name: 'status',
+                                    label: '状态',
+                                    type: 'mapping',
+                                    map: {
+                                        'active': '<span class="label label-success">活跃</span>',
+                                        'inactive': '<span class="label label-default">非活跃</span>',
+                                        'suspended': '<span class="label label-danger">已停用</span>',
+                                        'pending': '<span class="label label-warning">待审核</span>'
+                                    },
+                                    width: 80
+                                },
+                                {
+                                    name: 'role',
+                                    label: '角色',
+                                    type: 'mapping',
+                                    map: {
+                                        'user': '<span class="label label-default">用户</span>',
+                                        'admin': '<span class="label label-info">管理员</span>',
+                                        'super_admin': '<span class="label label-warning">超级管理员</span>'
+                                    },
+                                    width: 80
+                                },
+                                {
+                                    name: 'isVerified',
+                                    label: '已验证',
+                                    type: 'mapping',
+                                    map: {
+                                        '1': '<span class="label label-success">是</span>',
+                                        '0': '<span class="label label-default">否</span>'
+                                    },
+                                    width: 80
+                                },
+                                {
+                                    name: 'loginCount',
+                                    label: '登录次数',
+                                    type: 'text',
+                                    width: 80
+                                },
+                                {
+                                    name: 'lastLoginAt',
+                                    label: '最后登录',
+                                    type: 'datetime',
+                                    width: 150
+                                },
+                                {
+                                    name: 'createdAt',
+                                    label: '注册时间',
+                                    type: 'datetime',
+                                    width: 150
+                                },
+                                {
+                                    type: 'operation',
+                                    label: '操作',
+                                    width: 200,
+                                    buttons: [
+                                        {
+                                            type: 'button',
+                                            label: '详情',
+                                            level: 'info',
+                                            size: 'xs',
+                                            icon: 'fa fa-eye',
+                                            actionType: 'dialog',
+                                            dialog: {
+                                                title: '用户详情 - ${email}',
+                                                size: 'lg',
+                                                body: {
+                                                    type: 'service',
+                                                    api: {
+                                                        method: 'get',
+                                                        url: '/admin/users/${id}',
+                                                        headers: {
+                                                            'Authorization': 'Bearer ' + localStorage.getItem('admin_token')
+                                                        }
+                                                    },
+                                                    body: {
+                                                        type: 'tabs',
+                                                        tabs: [
+                                                            {
+                                                                title: '基本信息',
+                                                                body: {
+                                                                    type: 'form',
+                                                                    mode: 'normal',
+                                                                    body: [
+                                                                        {
+                                                                            type: 'static',
+                                                                            name: 'id',
+                                                                            label: 'ID'
+                                                                        },
+                                                                        {
+                                                                            type: 'static',
+                                                                            name: 'email',
+                                                                            label: '邮箱'
+                                                                        },
+                                                                        {
+                                                                            type: 'static',
+                                                                            name: 'status',
+                                                                            label: '状态',
+                                                                            tpl: '${status === "active" ? "活跃" : status === "inactive" ? "非活跃" : status === "suspended" ? "已停用" : "待审核"}'
+                                                                        },
+                                                                        {
+                                                                            type: 'static',
+                                                                            name: 'role',
+                                                                            label: '角色',
+                                                                            tpl: '${role === "user" ? "用户" : role === "admin" ? "管理员" : "超级管理员"}'
+                                                                        },
+                                                                        {
+                                                                            type: 'static',
+                                                                            name: 'isVerified',
+                                                                            label: '已验证',
+                                                                            tpl: '${isVerified ? "是" : "否"}'
+                                                                        },
+                                                                        {
+                                                                            type: 'static',
+                                                                            name: 'loginCount',
+                                                                            label: '登录次数'
+                                                                        },
+                                                                        {
+                                                                            type: 'static',
+                                                                            name: 'lastLoginAt',
+                                                                            label: '最后登录',
+                                                                            format: 'YYYY-MM-DD HH:mm:ss'
+                                                                        },
+                                                                        {
+                                                                            type: 'static',
+                                                                            name: 'lastLoginIp',
+                                                                            label: '最后登录IP'
+                                                                        },
+                                                                        {
+                                                                            type: 'static',
+                                                                            name: 'registeredIp',
+                                                                            label: '注册IP'
+                                                                        },
+                                                                        {
+                                                                            type: 'static',
+                                                                            name: 'riskLevel',
+                                                                            label: '风险等级',
+                                                                            tpl: '${riskLevel === "low" ? "低" : riskLevel === "medium" ? "中" : "高"}'
+                                                                        },
+                                                                        {
+                                                                            type: 'static',
+                                                                            name: 'createdAt',
+                                                                            label: '注册时间',
+                                                                            format: 'YYYY-MM-DD HH:mm:ss'
+                                                                        },
+                                                                        {
+                                                                            type: 'static',
+                                                                            name: 'notes',
+                                                                            label: '备注'
+                                                                        }
+                                                                    ]
+                                                                }
+                                                            },
+                                                            {
+                                                                title: '角色权限',
+                                                                body: {
+                                                                    type: 'service',
+                                                                    api: {
+                                                                        method: 'get',
+                                                                        url: '/admin/roles/users/${id}/roles',
+                                                                        headers: {
+                                                                            'Authorization': 'Bearer ' + localStorage.getItem('admin_token')
+                                                                        }
+                                                                    },
+                                                                    body: {
+                                                                        type: 'crud',
+                                                                        columns: [
+                                                                            {
+                                                                                name: 'name',
+                                                                                label: '角色名称'
+                                                                            },
+                                                                            {
+                                                                                name: 'description',
+                                                                                label: '角色描述'
+                                                                            },
+                                                                            {
+                                                                                name: 'permissions',
+                                                                                label: '权限',
+                                                                                type: 'tpl',
+                                                                                tpl: '${permissions}'
+                                                                            }
+                                                                        ]
+                                                                    }
+                                                                }
+                                                            },
+                                                            {
+                                                                title: '操作日志',
+                                                                body: {
+                                                                    type: 'service',
+                                                                    api: {
+                                                                        method: 'get',
+                                                                        url: '/admin/users/${id}/logs',
+                                                                        headers: {
+                                                                            'Authorization': 'Bearer ' + localStorage.getItem('admin_token')
+                                                                        }
+                                                                    },
+                                                                    body: {
+                                                                        type: 'crud',
+                                                                        columns: [
+                                                                            {
+                                                                                name: 'operation',
+                                                                                label: '操作类型',
+                                                                                type: 'mapping',
+                                                                                map: {
+                                                                                    'create': '创建',
+                                                                                    'update': '更新',
+                                                                                    'delete': '删除',
+                                                                                    'status_change': '状态变更',
+                                                                                    'role_change': '角色变更',
+                                                                                    'login': '登录',
+                                                                                    'logout': '登出'
+                                                                                }
+                                                                            },
+                                                                            {
+                                                                                name: 'result',
+                                                                                label: '结果',
+                                                                                type: 'mapping',
+                                                                                map: {
+                                                                                    'success': '<span class="label label-success">成功</span>',
+                                                                                    'failure': '<span class="label label-danger">失败</span>'
+                                                                                }
+                                                                            },
+                                                                            {
+                                                                                name: 'ipAddress',
+                                                                                label: 'IP地址'
+                                                                            },
+                                                                            {
+                                                                                name: 'timestamp',
+                                                                                label: '时间',
+                                                                                type: 'datetime',
+                                                                                format: 'YYYY-MM-DD HH:mm:ss'
+                                                                            }
+                                                                        ]
+                                                                    }
+                                                                }
+                                                            }
+                                                        ]
+                                                    }
+                                                }
+                                            }
+                                        },
+                                        {
+                                            type: 'button',
+                                            label: '状态',
+                                            level: 'warning',
+                                            size: 'xs',
+                                            icon: 'fa fa-toggle-on',
+                                            actionType: 'dialog',
+                                            dialog: {
+                                                title: '更改用户状态 - ${email}',
+                                                body: {
+                                                    type: 'form',
+                                                    api: {
+                                                        method: 'put',
+                                                        url: '/admin/users/${id}/status',
+                                                        headers: {
+                                                            'Authorization': 'Bearer ' + localStorage.getItem('admin_token')
+                                                        }
+                                                    },
+                                                    body: [
+                                                        {
+                                                            type: 'select',
+                                                            name: 'status',
+                                                            label: '新状态',
+                                                            required: true,
+                                                            options: [
+                                                                { label: '活跃', value: 'active' },
+                                                                { label: '非活跃', value: 'inactive' },
+                                                                { label: '已停用', value: 'suspended' },
+                                                                { label: '待审核', value: 'pending' }
+                                                            ]
+                                                        },
+                                                        {
+                                                            type: 'textarea',
+                                                            name: 'reason',
+                                                            label: '变更原因'
+                                                        }
+                                                    ]
+                                                }
+                                            }
+                                        },
+                                        {
+                                            type: 'button',
+                                            label: '角色',
+                                            level: 'primary',
+                                            size: 'xs',
+                                            icon: 'fa fa-user-tag',
+                                            actionType: 'dialog',
+                                            dialog: {
+                                                title: '分配角色 - ${email}',
+                                                body: {
+                                                    type: 'service',
+                                                    api: {
+                                                        method: 'get',
+                                                        url: '/admin/roles',
+                                                        headers: {
+                                                            'Authorization': 'Bearer ' + localStorage.getItem('admin_token')
+                                                        }
+                                                    },
+                                                    body: {
+                                                        type: 'form',
+                                                        api: {
+                                                            method: 'put',
+                                                            url: '/admin/users/${id}/role',
+                                                            headers: {
+                                                                'Authorization': 'Bearer ' + localStorage.getItem('admin_token')
+                                                            }
+                                                        },
+                                                        body: [
+                                                            {
+                                                                type: 'select',
+                                                                name: 'roleId',
+                                                                label: '选择角色',
+                                                                required: true,
+                                                                source: {
+                                                                    method: 'get',
+                                                                    url: '/admin/roles',
+                                                                    headers: {
+                                                                        'Authorization': 'Bearer ' + localStorage.getItem('admin_token')
+                                                                    },
+                                                                    adaptor: function(payload, response) {
+                                                                        const data = response.data || response;
+                                                                        return {
+                                                                            options: data.roles.map(role => ({
+                                                                                label: role.name,
+                                                                                value: role.id
+                                                                            }))
+                                                                        };
+                                                                    }
+                                                                }
+                                                            }
+                                                        ]
+                                                    }
+                                                }
+                                            }
+                                        },
+                                        {
+                                            type: 'button',
+                                            label: '会话',
+                                            level: 'info',
+                                            size: 'xs',
+                                            icon: 'fa fa-laptop',
+                                            actionType: 'dialog',
+                                            dialog: {
+                                                title: '用户会话 - ${email}',
+                                                body: {
+                                                    type: 'service',
+                                                    api: {
+                                                        method: 'get',
+                                                        url: '/admin/users/${id}/sessions',
+                                                        headers: {
+                                                            'Authorization': 'Bearer ' + localStorage.getItem('admin_token')
+                                                        }
+                                                    },
+                                                    body: {
+                                                        type: 'crud',
+                                                        columns: [
+                                                            {
+                                                                name: 'ipAddress',
+                                                                label: 'IP地址'
+                                                            },
+                                                            {
+                                                                name: 'userAgent',
+                                                                label: '用户代理'
+                                                            },
+                                                            {
+                                                                name: 'lastActivityAt',
+                                                                label: '最后活动',
+                                                                type: 'datetime',
+                                                                format: 'YYYY-MM-DD HH:mm:ss'
+                                                            },
+                                                            {
+                                                                name: 'expiresAt',
+                                                                label: '过期时间',
+                                                                type: 'datetime',
+                                                                format: 'YYYY-MM-DD HH:mm:ss'
+                                                            },
+                                                            {
+                                                                type: 'operation',
+                                                                label: '操作',
+                                                                width: 80,
+                                                                buttons: [
+                                                                    {
+                                                                        type: 'button',
+                                                                        label: '下线',
+                                                                        level: 'danger',
+                                                                        size: 'xs',
+                                                                        actionType: 'ajax',
+                                                                        confirmText: '确认强制该用户下线？',
+                                                                        api: {
+                                                                            method: 'delete',
+                                                                            url: '/admin/users/${id}/sessions/${sessionId}',
+                                                                            headers: {
+                                                                                'Authorization': 'Bearer ' + localStorage.getItem('admin_token')
+                                                                            }
+                                                                        }
+                                                                    }
+                                                                ]
+                                                            }
+                                                        ]
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    ]
+                                }
+                            ],
+                            headerToolbar: [
+                                {
+                                    type: 'form',
+                                    title: '搜索筛选',
+                                    target: 'crud',
+                                    mode: 'inline',
+                                    body: [
+                                        {
+                                            type: 'input-text',
+                                            name: 'search',
+                                            placeholder: '搜索邮箱...',
+                                            clearable: true
+                                        },
+                                        {
+                                            type: 'select',
+                                            name: 'status',
+                                            placeholder: '状态',
+                                            options: [
+                                                { label: '全部', value: '' },
+                                                { label: '活跃', value: 'active' },
+                                                { label: '非活跃', value: 'inactive' },
+                                                { label: '已停用', value: 'suspended' },
+                                                { label: '待审核', value: 'pending' }
+                                            ],
+                                            clearable: true
+                                        },
+                                        {
+                                            type: 'select',
+                                            name: 'role',
+                                            placeholder: '角色',
+                                            options: [
+                                                { label: '全部', value: '' },
+                                                { label: '用户', value: 'user' },
+                                                { label: '管理员', value: 'admin' },
+                                                { label: '超级管理员', value: 'super_admin' }
+                                            ],
+                                            clearable: true
+                                        },
+                                        {
+                                            type: 'submit',
+                                            label: '搜索',
+                                            level: 'primary'
+                                        }
+                                    ]
+                                },
                                 {
                                     type: 'button',
-                                    label: '编辑',
-                                    level: 'info',
-                                    size: 'sm',
+                                    label: '批量操作',
+                                    level: 'danger',
+                                    icon: 'fa fa-tasks',
                                     actionType: 'dialog',
                                     dialog: {
-                                        title: '编辑用户',
+                                        title: '批量操作',
                                         body: {
                                             type: 'form',
                                             api: {
-                                                method: 'put',
-                                                url: '/api/users/${id}',
+                                                method: 'post',
+                                                url: '/admin/users/batch',
                                                 headers: {
                                                     'Authorization': 'Bearer ' + localStorage.getItem('admin_token')
                                                 }
                                             },
                                             body: [
                                                 {
-                                                    type: 'input-text',
-                                                    name: 'email',
-                                                    label: '邮箱',
-                                                    required: true
+                                                    type: 'select',
+                                                    name: 'operation',
+                                                    label: '操作类型',
+                                                    required: true,
+                                                    options: [
+                                                        { label: '激活用户', value: 'activate' },
+                                                        { label: '停用用户', value: 'deactivate' },
+                                                        { label: '暂停用户', value: 'suspend' }
+                                                    ]
                                                 },
                                                 {
-                                                    type: 'input-password',
-                                                    name: 'password',
-                                                    label: '密码',
-                                                    placeholder: '留空则不修改密码'
+                                                    type: 'hidden',
+                                                    name: 'userIds',
+                                                    value: '${selectedItems|map:item=>item.id|join:,}'
                                                 }
                                             ]
                                         }
                                     }
                                 },
                                 {
-                                    type: 'button',
-                                    label: '删除',
-                                    level: 'danger',
-                                    size: 'sm',
-                                    actionType: 'ajax',
-                                    confirmText: '您确认要删除该用户?',
-                                    api: {
-                                        method: 'delete',
-                                        url: '/api/users/${id}',
-                                        headers: {
-                                            'Authorization': 'Bearer ' + localStorage.getItem('admin_token')
-                                        }
-                                    },
-                                    feedback: {
-                                        title: '删除成功',
-                                        body: '用户已成功删除'
-                                    }
+                                    type: 'pagination',
+                                    align: 'right'
+                                }
+                            ],
+                            footerToolbar: [
+                                'statistics',
+                                {
+                                    type: 'pagination',
+                                    align: 'right'
                                 }
                             ]
-                        }
-                    ],
-                    headerToolbar: [
-                        {
-                            type: 'button',
-                            label: '新增用户',
-                            actionType: 'dialog',
-                            dialog: {
-                                title: '新增用户',
-                                body: {
-                                    type: 'form',
-                                    api: {
-                                        method: 'post',
-                                        url: '/api/users',
-                                        headers: {
-                                            'Authorization': 'Bearer ' + localStorage.getItem('admin_token')
-                                        }
-                                    },
-                                    body: [
-                                        {
-                                            type: 'input-text',
-                                            name: 'email',
-                                            label: '邮箱',
-                                            required: true
-                                        },
-                                        {
-                                            type: 'input-password',
-                                            name: 'password',
-                                            label: '密码',
-                                            required: true
-                                        }
-                                    ]
-                                }
-                            }
-                        },
-                        'bulkActions',
-                        {
-                            type: 'pagination',
-                            align: 'right'
-                        }
-                    ],
-                    footerToolbar: [
-                        'statistics',
-                        {
-                            type: 'pagination',
-                            align: 'right'
                         }
                     ]
                 }
@@ -447,7 +1095,7 @@
                     type: 'crud',
                     api: {
                         method: 'get',
-                        url: '/api/sources/my',
+                        url: '/admin/sources',
                         headers: {
                             'Authorization': 'Bearer ' + localStorage.getItem('admin_token')
                         }
@@ -466,36 +1114,104 @@
                         {
                             name: 'id',
                             label: 'ID',
-                            type: 'text'
+                            type: 'text',
+                            width: 60
                         },
                         {
                             name: 'name',
-                            label: '名称',
-                            type: 'text'
+                            label: '源名称',
+                            type: 'text',
+                            searchable: true
                         },
                         {
                             name: 'url',
                             label: 'URL',
+                            type: 'text',
+                            searchable: true
+                        },
+                        {
+                            name: 'description',
+                            label: '描述',
+                            type: 'text'
+                        },
+                        {
+                            name: 'userId',
+                            label: '所属用户',
                             type: 'text'
                         },
                         {
                             name: 'isPublic',
-                            label: '是否公开',
+                            label: '公开',
                             type: 'mapping',
                             map: {
-                                '1': '<span class="label label-success">是</span>',
-                                '0': '<span class="label label-default">否</span>'
+                                'true': '<span class="label label-success">公开</span>',
+                                'false': '<span class="label label-default">私有</span>'
                             }
                         },
                         {
-                            name: 'lastFetchedAt',
-                            label: '上次获取时间',
-                            type: 'datetime'
+                            name: 'isRecommended',
+                            label: '推荐',
+                            type: 'mapping',
+                            map: {
+                                'true': '<span class="label label-info">推荐</span>',
+                                'false': '<span class="label label-default">普通</span>'
+                            }
+                        },
+                        {
+                            name: 'recommendationLevel',
+                            label: '推荐级别',
+                            type: 'mapping',
+                            map: {
+                                'basic': '<span class="label label-default">基础</span>',
+                                'premium': '<span class="label label-warning">高级</span>',
+                                'featured': '<span class="label label-purple">精选</span>'
+                            }
+                        },
+                        {
+                            name: 'qualityValidationStatus',
+                            label: '验证状态',
+                            type: 'mapping',
+                            map: {
+                                'pending': '<span class="label label-warning">待验证</span>',
+                                'approved': '<span class="label label-success">已通过</span>',
+                                'rejected': '<span class="label label-danger">已拒绝</span>'
+                            }
+                        },
+                        {
+                            name: 'qualityAvailability',
+                            label: '可用性',
+                            type: 'text',
+                            width: 80
+                        },
+                        {
+                            name: 'qualityContentQuality',
+                            label: '内容质量',
+                            type: 'text',
+                            width: 80
                         },
                         {
                             name: 'fetchFailureCount',
                             label: '失败次数',
-                            type: 'text'
+                            type: 'text',
+                            width: 80
+                        },
+                        {
+                            name: 'lastFetchedAt',
+                            label: '上次获取',
+                            type: 'datetime',
+                            format: 'YYYY-MM-DD HH:mm:ss'
+                        },
+                        {
+                            name: 'statisticsTotalSubscribers',
+                            label: '总订阅',
+                            type: 'text',
+                            width: 80
+                        },
+                        {
+                            name: 'createdAt',
+                            label: '创建时间',
+                            type: 'datetime',
+                            format: 'YYYY-MM-DD HH:mm:ss'
                         },
                         {
                             type: 'operation',
@@ -503,11 +1219,94 @@
                             width: 260,
                             buttons: [
                                 {
+                                    label: '查看详情',
                                     type: 'button',
-                                    label: '抓取',
                                     level: 'primary',
-                                    size: 'xs',
-                                    icon: 'fa fa-refresh',
+                                    actionType: 'dialog',
+                                    dialog: {
+                                        title: 'RSS源详情',
+                                        body: {
+                                            type: 'form',
+                                            static: true,
+                                            body: [
+                                                {
+                                                    type: 'static',
+                                                    name: 'id',
+                                                    label: 'ID'
+                                                },
+                                                {
+                                                    type: 'static',
+                                                    name: 'name',
+                                                    label: '名称'
+                                                },
+                                                {
+                                                    type: 'static',
+                                                    name: 'url',
+                                                    label: 'URL'
+                                                },
+                                                {
+                                                    type: 'static',
+                                                    name: 'description',
+                                                    label: '描述'
+                                                },
+                                                {
+                                                    type: 'static',
+                                                    name: 'userId',
+                                                    label: '所属用户ID'
+                                                },
+                                                {
+                                                    type: 'static',
+                                                    name: 'isPublic',
+                                                    label: '是否公开'
+                                                },
+                                                {
+                                                    type: 'static',
+                                                    name: 'isRecommended',
+                                                    label: '是否推荐'
+                                                },
+                                                {
+                                                    type: 'static',
+                                                    name: 'recommendationLevel',
+                                                    label: '推荐级别'
+                                                },
+                                                {
+                                                    type: 'static',
+                                                    name: 'qualityAvailability',
+                                                    label: '可用性评分'
+                                                },
+                                                {
+                                                    type: 'static',
+                                                    name: 'qualityContentQuality',
+                                                    label: '内容质量评分'
+                                                },
+                                                {
+                                                    type: 'static',
+                                                    name: 'qualityUpdateFrequency',
+                                                    label: '更新频率评分'
+                                                },
+                                                {
+                                                    type: 'static',
+                                                    name: 'qualityValidationStatus',
+                                                    label: '验证状态'
+                                                },
+                                                {
+                                                    type: 'static',
+                                                    name: 'fetchFailureCount',
+                                                    label: '获取失败次数'
+                                                },
+                                                {
+                                                    type: 'static',
+                                                    name: 'statisticsTotalSubscribers',
+                                                    label: '总订阅数'
+                                                }
+                                            ]
+                                        }
+                                    }
+                                },
+                                {
+                                    label: '手动获取',
+                                    type: 'button',
+                                    level: 'info',
                                     actionType: 'ajax',
                                     api: {
                                         method: 'post',
@@ -516,11 +1315,7 @@
                                             'Authorization': 'Bearer ' + localStorage.getItem('admin_token')
                                         }
                                     },
-                                    confirmText: '确认手动触发抓取该RSS源？',
-                                    feedback: {
-                                        title: '抓取触发成功',
-                                        body: 'RSS抓取任务已添加到队列中'
-                                    }
+                                    confirmText: '确定要手动触发此RSS源的获取吗？'
                                 },
                                 {
                                     type: 'button',
@@ -710,55 +1505,56 @@
                             ]
                         }
                     ],
+                    filter: {
+                        title: '搜索筛选',
+                        submitText: '搜索',
+                        controls: [
+                            {
+                                type: 'text',
+                                name: 'search',
+                                label: '搜索',
+                                placeholder: '搜索名称、URL或描述'
+                            },
+                            {
+                                type: 'select',
+                                name: 'isRecommended',
+                                label: '推荐状态',
+                                options: [
+                                    { label: '全部', value: '' },
+                                    { label: '推荐源', value: 'true' },
+                                    { label: '普通源', value: 'false' }
+                                ]
+                            },
+                            {
+                                type: 'select',
+                                name: 'qualityValidationStatus',
+                                label: '验证状态',
+                                options: [
+                                    { label: '全部', value: '' },
+                                    { label: '待验证', value: 'pending' },
+                                    { label: '已通过', value: 'approved' },
+                                    { label: '已拒绝', value: 'rejected' }
+                                ]
+                            },
+                            {
+                                type: 'text',
+                                name: 'userId',
+                                label: '用户ID',
+                                placeholder: '输入用户ID'
+                            }
+                        ]
+                    },
+                    features: ['filter', 'create', 'update', 'delete'],
                     headerToolbar: [
                         {
-                            type: 'button',
-                            label: '新增RSS源',
-                            actionType: 'dialog',
-                            dialog: {
-                                title: '新增RSS源',
-                                body: {
-                                    type: 'form',
-                                    api: {
-                                        method: 'post',
-                                        url: '/api/sources',
-                                        headers: {
-                                            'Authorization': 'Bearer ' + localStorage.getItem('admin_token')
-                                        }
-                                    },
-                                    body: [
-                                        {
-                                            type: 'input-text',
-                                            name: 'name',
-                                            label: '名称',
-                                            required: true
-                                        },
-                                        {
-                                            type: 'input-text',
-                                            name: 'url',
-                                            label: 'URL',
-                                            required: true
-                                        },
-                                        {
-                                            type: 'input-text',
-                                            name: 'description',
-                                            label: '描述'
-                                        },
-                                        {
-                                            type: 'switch',
-                                            name: 'isPublic',
-                                            label: '是否公开',
-                                            trueValue: true,
-                                            falseValue: false
-                                        }
-                                    ]
-                                }
-                            }
+                            type: 'reload',
+                            label: '刷新',
+                            icon: 'fa fa-refresh'
                         },
-                        'bulkActions',
                         {
-                            type: 'pagination',
-                            align: 'right'
+                            type: 'columns-toggler',
+                            label: '列显示',
+                            icon: 'fa fa-columns'
                         }
                     ],
                     footerToolbar: [
@@ -781,7 +1577,7 @@
                     type: 'service',
                     api: {
                         method: 'get',
-                        url: '/api/system/stats',
+                        url: '/system/stats',
                         headers: {
                             'Authorization': 'Bearer ' + localStorage.getItem('admin_token')
                         },
@@ -832,7 +1628,7 @@
                     type: 'crud',
                     api: {
                         method: 'get',
-                        url: '/api/sources/entries/all',
+                        url: '/sources/entries/all',
                         headers: {
                             'Authorization': 'Bearer ' + localStorage.getItem('admin_token')
                         }
@@ -1030,12 +1826,54 @@
         // 全局登出函数
         window.logout = logout;
 
+        // 启动token过期检查定时器
+        let tokenCheckInterval;
+        function startTokenExpiryCheck() {
+            // 清除之前的定时器
+            if (tokenCheckInterval) {
+                clearInterval(tokenCheckInterval);
+            }
+            
+            // 每分钟检查一次token状态
+            tokenCheckInterval = setInterval(() => {
+                if (isLoggedIn()) {
+                    // 显示过期提醒（如果需要）
+                    showTokenExpiryWarning();
+                } else {
+                    // 如果已经登出，停止检查
+                    clearInterval(tokenCheckInterval);
+                }
+            }, 60 * 1000); // 每分钟检查一次
+            
+            // 立即执行一次检查
+            showTokenExpiryWarning();
+        }
+
+        // 停止token过期检查
+        function stopTokenExpiryCheck() {
+            if (tokenCheckInterval) {
+                clearInterval(tokenCheckInterval);
+                tokenCheckInterval = null;
+            }
+            
+            // 移除过期提醒
+            const warning = document.getElementById('token-expiry-warning');
+            if (warning) {
+                warning.remove();
+            }
+        }
+
         // Hash变化监听器 - 重新渲染页面以触发amis的visibleOn重新计算
         function handleHashChange() {
             console.log('Hash变化检测:', window.location.hash);
             // 需要重新渲染amis实例才能让visibleOn重新计算
             renderMainPage();
         }
+
+        // 页面卸载时清理资源
+        window.addEventListener('beforeunload', () => {
+            stopTokenExpiryCheck();
+        });
 
         // 页面加载时检查登录状态并初始化
         if (isLoggedIn()) {
@@ -1045,6 +1883,10 @@
             // 绑定Hash变化监听器
             console.log('绑定Hash变化监听器');
             window.addEventListener('hashchange', handleHashChange);
+            
+            // 启动token过期检查
+            console.log('启动token过期检查');
+            startTokenExpiryCheck();
         } else {
             console.log('用户未登录，显示登录页面');
             renderLoginPage();

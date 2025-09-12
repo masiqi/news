@@ -31,10 +31,10 @@ const server = http.createServer((req, res) => {
     return;
   }
   
-  // 处理API代理请求
-  if (pathname.startsWith('/api/') && (req.method === 'GET' || req.method === 'POST')) {
-    // 构造后端API的路径
-    const backendPath = pathname.replace('/api', '');
+  // 处理API和Admin代理请求
+  if ((pathname.startsWith('/api/') || pathname.startsWith('/admin/') || pathname.startsWith('/sources/') || pathname.startsWith('/system/')) && (req.method === 'GET' || req.method === 'POST' || req.method === 'PUT' || req.method === 'DELETE' || req.method === 'PATCH')) {
+    // 构造后端API的路径 - 保持原有的路径结构
+    const backendPath = pathname;
     console.log(`代理请求: ${req.method} ${pathname} -> ${backendUrl}${backendPath}`);
     console.log(`请求headers:`, req.headers);
     
@@ -73,8 +73,8 @@ const server = http.createServer((req, res) => {
       });
     });
     
-    // 如果是POST请求，转发请求体
-    if (req.method === 'POST') {
+    // 如果是POST/PUT/PATCH/DELETE请求，转发请求体
+    if (req.method === 'POST' || req.method === 'PUT' || req.method === 'PATCH' || req.method === 'DELETE') {
       let body = '';
       req.on('data', chunk => {
         body += chunk.toString();

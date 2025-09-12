@@ -4,7 +4,7 @@ import { userAuthMiddleware } from '../../middleware/auth.middleware';
 import { OnboardingService, InterestInput, OnboardingStep, InterestCategory, UserInterest, RecommendedSource } from '../../services/onboarding/onboarding.service';
 import { InterestService, InterestWithStats } from '../../services/onboarding/interest.service';
 import { RecommendationService } from '../../services/onboarding/recommendation.service';
-import { db } from '../index';
+import { initDB } from '../../db/index';
 import { sql, eq, and, or, isNull } from 'drizzle-orm';
 import type { Env } from '../../env';
 
@@ -17,7 +17,7 @@ onboardingRoutes.use('*', userAuthMiddleware);
 onboardingRoutes.get('/categories', async (c) => {
   try {
     const interestService = new InterestService();
-    const categories = await interestService.getAllCategories();
+    const categories = await interestService.getAllCategories(initDB(c.env.DB));
     
     return c.json({ 
       success: true, 
@@ -37,7 +37,7 @@ onboardingRoutes.get('/categories/popular', async (c) => {
   try {
     const interestService = new InterestService();
     const { limit } = c.req.query();
-    const categories = await interestService.getPopularCategories(parseInt(limit as string) || 10);
+    const categories = await interestService.getPopularCategories(parseInt(limit as string) || 10, initDB(c.env.DB));
     
     return c.json({ 
       success: true, 
@@ -57,7 +57,7 @@ onboardingRoutes.get('/categories/search', async (c) => {
   try {
     const { q } = c.req.query();
     const interestService = new InterestService();
-    const categories = await interestService.searchCategories(q as string);
+    const categories = await interestService.searchCategories(q as string, initDB(c.env.DB));
     
     return c.json({ 
       success: true, 
@@ -82,7 +82,7 @@ onboardingRoutes.get('/interests', async (c) => {
     }
 
     const interestService = new InterestService();
-    const interests = await interestService.getUserInterests(user.id);
+    const interests = await interestService.getUserInterests(user.id, initDB(c.env.DB));
     
     return c.json({ 
       success: true, 
@@ -123,7 +123,7 @@ onboardingRoutes.post('/interests', async (c) => {
     }
 
     const onboardingService = new OnboardingService();
-    await onboardingService.saveUserInterests(user.id, interests);
+    await onboardingService.saveUserInterests(user.id, interests, initDB(c.env.DB));
     
     return c.json({ 
       success: true, 
@@ -153,7 +153,7 @@ onboardingRoutes.post('/recommendations', async (c) => {
     }
 
     const onboardingService = new OnboardingService();
-    const recommendations = await onboardingService.recommendSources(user.id, interests);
+    const recommendations = await onboardingService.recommendSources(user.id, interests, initDB(c.env.DB));
     
     return c.json({ 
       success: true, 
@@ -183,7 +183,7 @@ onboardingRoutes.post('/confirm-sources', async (c) => {
     }
 
     const onboardingService = new OnboardingService();
-    const result = await onboardingService.confirmSources(user.id, sourceIds);
+    const result = await onboardingService.confirmSources(user.id, sourceIds, initDB(c.env.DB));
     
     return c.json(result);
   } catch (error) {
@@ -204,11 +204,11 @@ onboardingRoutes.get('/status', async (c) => {
     }
 
     const onboardingService = new OnboardingService();
-    const status = await onboardingService.getOnboardingStatus(user.id);
+    const status = await onboardingService.getOnboardingStatus(user.id, initDB(c.env.DB));
     
     if (!status) {
       // 如果没有状态记录，检查是否需要引导
-      const needsOnboarding = await onboardingService.needsOnboarding(user.id);
+      const needsOnboarding = await onboardingService.needsOnboarding(user.id, initDB(c.env.DB));
       
       return c.json({ 
         success: true, 
@@ -217,7 +217,7 @@ onboardingRoutes.get('/status', async (c) => {
       });
     }
     
-    const progress = await onboardingService.getOnboardingProgress(user.id);
+    const progress = await onboardingService.getOnboardingProgress(user.id, initDB(c.env.DB));
     
     return c.json({ 
       success: true, 
@@ -249,7 +249,7 @@ onboardingRoutes.put('/status', async (c) => {
     }
 
     const onboardingService = new OnboardingService();
-    const status = await onboardingService.updateOnboardingStatus(user.id, { step, data });
+    const status = await onboardingService.updateOnboardingStatus(user.id, { step, data }, initDB(c.env.DB));
     
     return c.json({ 
       success: true, 
@@ -273,7 +273,7 @@ onboardingRoutes.post('/skip', async (c) => {
     }
 
     const onboardingService = new OnboardingService();
-    const result = await onboardingService.skipOnboarding(user.id);
+    const result = await onboardingService.skipOnboarding(user.id, initDB(c.env.DB));
     
     return c.json(result);
   } catch (error) {
@@ -294,7 +294,7 @@ onboardingRoutes.post('/complete', async (c) => {
     }
 
     const onboardingService = new OnboardingService();
-    const result = await onboardingService.completeOnboarding(user.id);
+    const result = await onboardingService.completeOnboarding(user.id, initDB(c.env.DB));
     
     return c.json(result);
   } catch (error) {
@@ -315,7 +315,7 @@ onboardingRoutes.post('/initialize', async (c) => {
     }
 
     const onboardingService = new OnboardingService();
-    const status = await onboardingService.initializeOnboarding(user.id);
+    const status = await onboardingService.initializeOnboarding(user.id, initDB(c.env.DB));
     
     return c.json({ 
       success: true, 
@@ -339,7 +339,7 @@ onboardingRoutes.get('/progress', async (c) => {
     }
 
     const onboardingService = new OnboardingService();
-    const progress = await onboardingService.getOnboardingProgress(user.id);
+    const progress = await onboardingService.getOnboardingProgress(user.id, initDB(c.env.DB));
     
     return c.json({ 
       success: true, 
@@ -363,7 +363,7 @@ onboardingRoutes.get('/personalized-recommendations', async (c) => {
     }
 
     const { limit } = c.req.query();
-    const recommendationService = new RecommendationService();
+    const recommendationService = new RecommendationService(initDB(c.env.DB));
     const recommendations = await recommendationService.getPersonalizedRecommendations(user.id, parseInt(limit as string) || 20);
     
     return c.json({ 
@@ -383,7 +383,7 @@ onboardingRoutes.get('/personalized-recommendations', async (c) => {
 onboardingRoutes.get('/trending-recommendations', async (c) => {
   try {
     const { limit } = c.req.query();
-    const recommendationService = new RecommendationService();
+    const recommendationService = new RecommendationService(initDB(c.env.DB));
     const recommendations = await recommendationService.getTrendingRecommendedSources(parseInt(limit as string) || 10);
     
     return c.json({ 
@@ -409,7 +409,7 @@ onboardingRoutes.get('/recommendations/by-category/:categoryId', async (c) => {
       return c.json({ success: false, error: '分类ID无效' }, 400);
     }
 
-    const recommendationService = new RecommendationService();
+    const recommendationService = new RecommendationService(initDB(c.env.DB));
     const recommendations = await recommendationService.getRecommendationsByCategory(categoryId, parseInt(limit as string) || 20);
     
     return c.json({ 

@@ -1,0 +1,18 @@
+{
+  "name": "news-platform-simple",
+  "main": "src/index-simple.ts",
+  "compatibility_date": "2024-09-23",
+  "compatibility_flags": ["nodejs_compat"],
+  "vars": {
+    "JWT_SECRET": "development_jwt_secret_key_for_local_testing_only",
+    "ADMIN_USERNAME": "admin",
+    "ADMIN_PASSWORD": "admin123"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "news-platform-simple",
+      "database_id": "news-platform-simple"
+    }
+  ]
+}

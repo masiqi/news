@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { adminAuthMiddleware, adminAuditMiddleware, getCurrentUser } from '../../middleware/admin-auth.middleware';
-import { db } from '../index';
+import { initDB } from '../../db/index';
 import { sourceCategories, sourceCategoryRelations } from '../../db/schema';
 import { eq, and, or, like, desc, asc, sql } from 'drizzle-orm';
 
@@ -30,7 +30,7 @@ adminCategoriesRoutes.get('/', async (c) => {
     }
 
     // 构建查询
-    let query = db.select().from(sourceCategories);
+    let query = initDB(c.env.DB).select().from(sourceCategories);
     
     if (whereConditions.length > 0) {
       query = query.where(and(...whereConditions));
@@ -59,7 +59,7 @@ adminCategoriesRoutes.get('/:id', async (c) => {
       return c.json({ error: '无效的分类ID' }, 400);
     }
 
-    const [category] = await db
+    const [category] = await initDB(c.env.DB)
       .select()
       .from(sourceCategories)
       .where(eq(sourceCategories.id, categoryId));
@@ -69,7 +69,7 @@ adminCategoriesRoutes.get('/:id', async (c) => {
     }
 
     // 获取该分类下的源数量
-    const [sourceCount] = await db
+    const [sourceCount] = await initDB(c.env.DB)
       .select({ count: sql`count(*)` })
       .from(sourceCategoryRelations)
       .where(eq(sourceCategoryRelations.categoryId, categoryId));
@@ -103,7 +103,7 @@ adminCategoriesRoutes.post('/', async (c) => {
     }
 
     // 检查名称是否已存在
-    const [existingCategory] = await db
+    const [existingCategory] = await initDB(c.env.DB)
       .select()
       .from(sourceCategories)
       .where(eq(sourceCategories.name, name));
@@ -115,7 +115,7 @@ adminCategoriesRoutes.post('/', async (c) => {
     const now = new Date();
     
     // 创建分类
-    const [newCategory] = await db
+    const [newCategory] = await initDB(c.env.DB)
       .insert(sourceCategories)
       .values({
         name,
@@ -193,7 +193,7 @@ adminCategoriesRoutes.put('/:id', async (c) => {
     };
 
     // 更新分类
-    const [updatedCategory] = await db
+    const [updatedCategory] = await initDB(c.env.DB)
       .update(sourceCategories)
       .set(updateData)
       .where(eq(sourceCategories.id, categoryId))
@@ -216,7 +216,7 @@ adminCategoriesRoutes.delete('/:id', async (c) => {
     }
 
     // 检查分类是否存在
-    const [category] = await db
+    const [category] = await initDB(c.env.DB)
       .select()
       .from(sourceCategories)
       .where(eq(sourceCategories.id, categoryId));
@@ -226,7 +226,7 @@ adminCategoriesRoutes.delete('/:id', async (c) => {
     }
 
     // 检查是否有关联的源
-    const [sourceCount] = await db
+    const [sourceCount] = await initDB(c.env.DB)
       .select({ count: sql`count(*)` })
       .from(sourceCategoryRelations)
       .where(eq(sourceCategoryRelations.categoryId, categoryId));
@@ -239,7 +239,7 @@ adminCategoriesRoutes.delete('/:id', async (c) => {
     }
 
     // 删除分类
-    await db.delete(sourceCategories).where(eq(sourceCategories.id, categoryId));
+    await initDB(c.env.DB).delete(sourceCategories).where(eq(sourceCategories.id, categoryId));
 
     return c.json({ success: true });
   } catch (error) {
@@ -266,7 +266,7 @@ adminCategoriesRoutes.patch('/reorder', async (c) => {
 
     // 批量更新排序
     const updatePromises = categoryOrders.map(item =>
-      db
+      initDB(c.env.DB)
         .update(sourceCategories)
         .set({ 
           sortOrder: item.sortOrder,
@@ -299,7 +299,7 @@ adminCategoriesRoutes.patch('/:id/toggle', async (c) => {
     }
 
     // 检查分类是否存在
-    const [category] = await db
+    const [category] = await initDB(c.env.DB)
       .select()
       .from(sourceCategories)
       .where(eq(sourceCategories.id, categoryId));
@@ -309,7 +309,7 @@ adminCategoriesRoutes.patch('/:id/toggle', async (c) => {
     }
 
     // 更新分类状态
-    const [updatedCategory] = await db
+    const [updatedCategory] = await initDB(c.env.DB)
       .update(sourceCategories)
       .set({ 
         isActive,

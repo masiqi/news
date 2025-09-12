@@ -1,4 +1,4 @@
-import { db } from '../index';
+import { initDB } from '../../db/index';
 import { sources, sourceValidationHistories } from '../../db/schema';
 import { eq, and, or, isNull, lte, desc, sql, gte } from 'drizzle-orm';
 import { QualityAssessmentService } from './quality-assessment.service';
@@ -25,8 +25,9 @@ interface ValidationResult {
 export class ValidationSchedulerService {
   private config: ValidationSchedulerConfig;
   private qualityService: QualityAssessmentService;
+  private db: any;
 
-  constructor(config: Partial<ValidationSchedulerConfig> = {}) {
+  constructor(config: Partial<ValidationSchedulerConfig> = {}, db?: any) {
     this.config = {
       batchSize: 10,
       intervalMinutes: 60,
@@ -34,7 +35,8 @@ export class ValidationSchedulerService {
       enabled: true,
       ...config,
     };
-    this.qualityService = new QualityAssessmentService();
+    this.db = db;
+    this.qualityService = new QualityAssessmentService(db);
   }
 
   /**
@@ -43,7 +45,7 @@ export class ValidationSchedulerService {
   async getSourcesNeedingValidation(): Promise<any[]> {
     const cutoffTime = new Date(Date.now() - this.config.maxAgeHours * 60 * 60 * 1000);
     
-    const sourcesList = await db
+    const sourcesList = await this.db
       .select()
       .from(sources)
       .where(
@@ -68,7 +70,7 @@ export class ValidationSchedulerService {
   async getSourcesAtRisk(): Promise<any[]> {
     const threshold = 60;
     
-    const sourcesList = await db
+    const sourcesList = await this.db
       .select()
       .from(sources)
       .where(
@@ -233,7 +235,7 @@ export class ValidationSchedulerService {
     const newStatus = result.status === 'passed' ? 'approved' : 
                      result.status === 'failed' ? 'rejected' : 'pending';
 
-    await db
+    await this.db
       .update(sources)
       .set({
         qualityAvailability: result.metrics.availability,
@@ -262,19 +264,19 @@ export class ValidationSchedulerService {
     const last24h = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
     // 总推荐源数
-    const [totalSourcesResult] = await db
+    const [totalSourcesResult] = await this.db
       .select({ count: sql`count(*)`.mapWith(Number) })
       .from(sources)
       .where(eq(sources.isRecommended, true));
 
     // 最近24小时验证数
-    const [validated24hResult] = await db
+    const [validated24hResult] = await this.db
       .select({ count: sql`count(*)`.mapWith(Number) })
       .from(sourceValidationHistories)
       .where(gte(sourceValidationHistories.validatedAt, last24h));
 
     // 最近24小时通过数
-    const [passed24hResult] = await db
+    const [passed24hResult] = await this.db
       .select({ count: sql`count(*)`.mapWith(Number) })
       .from(sourceValidationHistories)
       .where(
@@ -285,7 +287,7 @@ export class ValidationSchedulerService {
       );
 
     // 最近24小时失败数
-    const [failed24hResult] = await db
+    const [failed24hResult] = await this.db
       .select({ count: sql`count(*)`.mapWith(Number) })
       .from(sourceValidationHistories)
       .where(
@@ -296,7 +298,7 @@ export class ValidationSchedulerService {
       );
 
     // 平均质量评分
-    const [avgQualityResult] = await db
+    const [avgQualityResult] = await this.db
       .select({
         avg: sql`AVG(${sources.qualityAvailability} + ${sources.qualityContentQuality} + ${sources.qualityUpdateFrequency}) / 3`.mapWith(Number),
       })
@@ -324,7 +326,7 @@ export class ValidationSchedulerService {
    * 获取验证历史记录
    */
   async getRecentValidationHistory(limit: number = 50): Promise<any[]> {
-    const history = await db
+    const history = await this.db
       .select({
         id: sourceValidationHistories.id,
         sourceId: sourceValidationHistories.sourceId,

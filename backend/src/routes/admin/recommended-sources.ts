@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { adminAuthMiddleware, adminAuditMiddleware, getCurrentUser } from '../../middleware/admin-auth.middleware';
 import { SourceStateService, SourceFilterOptions, SourceStateUpdate } from '../../services/admin/source-state.service';
 import { QualityAssessmentService } from '../../services/admin/quality-assessment.service';
-import { db } from '../index';
+import { initDB } from '../../db/index';
 import { sources, sourceCategories, sourceTags, sourceCategoryRelations, sourceTagRelations } from '../../db/schema';
 import { eq, and, or, like, inArray } from 'drizzle-orm';
 
@@ -40,7 +40,7 @@ adminRecommendedSourcesRoutes.get('/', async (c) => {
       limit: parseInt(limit),
     };
 
-    const result = await sourceStateService.getRecommendedSources(options);
+    const result = await sourceStateService.getRecommendedSources(options, initDB(c.env.DB));
     
     return c.json(result);
   } catch (error) {
@@ -52,7 +52,7 @@ adminRecommendedSourcesRoutes.get('/', async (c) => {
 // 获取推荐源统计信息
 adminRecommendedSourcesRoutes.get('/statistics', async (c) => {
   try {
-    const statistics = await sourceStateService.getRecommendedSourcesStatistics();
+    const statistics = await sourceStateService.getRecommendedSourcesStatistics(initDB(c.env.DB));
     return c.json({ statistics });
   } catch (error) {
     console.error('获取推荐源统计失败:', error);
@@ -69,7 +69,7 @@ adminRecommendedSourcesRoutes.get('/:id', async (c) => {
       return c.json({ error: '无效的源ID' }, 400);
     }
 
-    const [source] = await db
+    const [source] = await initDB(c.env.DB)
       .select()
       .from(sources)
       .where(eq(sources.id, sourceId));
@@ -117,7 +117,7 @@ adminRecommendedSourcesRoutes.post('/', async (c) => {
     }
 
     // 创建推荐源
-    const [newSource] = await db
+    const [newSource] = await initDB(c.env.DB)
       .insert(sources)
       .values({
         userId: 0, // 管理员创建的源，userId设为0
@@ -139,7 +139,7 @@ adminRecommendedSourcesRoutes.post('/', async (c) => {
 
     // 处理分类关联
     if (categoryIds.length > 0) {
-      await db
+      await initDB(c.env.DB)
         .insert(sourceCategoryRelations)
         .values(
           categoryIds.map((categoryId: number) => ({
@@ -152,7 +152,7 @@ adminRecommendedSourcesRoutes.post('/', async (c) => {
 
     // 处理标签关联
     if (tagIds.length > 0) {
-      await db
+      await initDB(c.env.DB)
         .insert(sourceTagRelations)
         .values(
           tagIds.map((tagId: number) => ({
@@ -190,7 +190,7 @@ adminRecommendedSourcesRoutes.put('/:id', async (c) => {
     } = await c.req.json();
 
     // 检查源是否存在
-    const [existingSource] = await db
+    const [existingSource] = await initDB(c.env.DB)
       .select()
       .from(sources)
       .where(eq(sources.id, sourceId));
@@ -209,7 +209,7 @@ adminRecommendedSourcesRoutes.put('/:id', async (c) => {
     };
 
     // 更新源信息
-    const [updatedSource] = await db
+    const [updatedSource] = await initDB(c.env.DB)
       .update(sources)
       .set(updateData)
       .where(eq(sources.id, sourceId))
@@ -218,13 +218,13 @@ adminRecommendedSourcesRoutes.put('/:id', async (c) => {
     // 更新分类关联
     if (categoryIds !== undefined) {
       // 先删除现有关联
-      await db
+      await initDB(c.env.DB)
         .delete(sourceCategoryRelations)
         .where(eq(sourceCategoryRelations.sourceId, sourceId));
 
       // 添加新关联
       if (categoryIds.length > 0) {
-        await db
+        await initDB(c.env.DB)
           .insert(sourceCategoryRelations)
           .values(
             categoryIds.map((categoryId: number) => ({
@@ -239,13 +239,13 @@ adminRecommendedSourcesRoutes.put('/:id', async (c) => {
     // 更新标签关联
     if (tagIds !== undefined) {
       // 先删除现有关联
-      await db
+      await initDB(c.env.DB)
         .delete(sourceTagRelations)
         .where(eq(sourceTagRelations.sourceId, sourceId));
 
       // 添加新关联
       if (tagIds.length > 0) {
-        await db
+        await initDB(c.env.DB)
           .insert(sourceTagRelations)
           .values(
             tagIds.map((tagId: number) => ({
@@ -274,7 +274,7 @@ adminRecommendedSourcesRoutes.delete('/:id', async (c) => {
     }
 
     // 检查源是否存在
-    const [source] = await db
+    const [source] = await initDB(c.env.DB)
       .select()
       .from(sources)
       .where(eq(sources.id, sourceId));
@@ -284,7 +284,7 @@ adminRecommendedSourcesRoutes.delete('/:id', async (c) => {
     }
 
     // 删除源（相关的关联会通过级联删除自动处理）
-    await db.delete(sources).where(eq(sources.id, sourceId));
+    await initDB(c.env.DB).delete(sources).where(eq(sources.id, sourceId));
 
     return c.json({ success: true });
   } catch (error) {
@@ -304,7 +304,7 @@ adminRecommendedSourcesRoutes.post('/:id/validate', async (c) => {
     }
 
     // 检查源是否存在
-    const [source] = await db
+    const [source] = await initDB(c.env.DB)
       .select()
       .from(sources)
       .where(eq(sources.id, sourceId));
@@ -314,20 +314,21 @@ adminRecommendedSourcesRoutes.post('/:id/validate', async (c) => {
     }
 
     // 执行质量评估
-    const validationResult = await qualityAssessmentService.assessSourceQuality(sourceId);
+    const validationResult = await qualityAssessmentService.assessSourceQuality(sourceId, initDB(c.env.DB));
     
     // 记录验证历史
     await qualityAssessmentService.recordValidationHistory(
       validationResult,
       'manual',
-      user?.id
+      user?.id,
+      initDB(c.env.DB)
     );
 
     // 更新源的质量信息
     await sourceStateService.updateSourceState(sourceId, {
       validationStatus: validationResult.status,
       validationNotes: validationResult.errorMessage,
-    }, user?.id);
+    }, user?.id, initDB(c.env.DB));
 
     return c.json({ validation: validationResult });
   } catch (error) {
@@ -345,7 +346,7 @@ adminRecommendedSourcesRoutes.post('/batch-validate', async (c) => {
       return c.json({ error: '请提供有效的源ID列表' }, 400);
     }
 
-    const results = await qualityAssessmentService.batchValidateSources(sourceIds);
+    const results = await qualityAssessmentService.batchValidateSources(sourceIds, initDB(c.env.DB));
 
     return c.json({ 
       results,
@@ -378,7 +379,8 @@ adminRecommendedSourcesRoutes.patch('/:id/toggle', async (c) => {
     const updatedSource = await sourceStateService.toggleSourceRecommendation(
       sourceId,
       isRecommended,
-      user?.id
+      user?.id,
+      initDB(c.env.DB)
     );
 
     if (!updatedSource) {

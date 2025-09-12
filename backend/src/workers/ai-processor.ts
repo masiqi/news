@@ -186,7 +186,7 @@ export default {
         throw new Error(`LLM内容处理失败: ${error instanceof Error ? error.message : '未知错误'}`);
       }
     });
-  },
+  }
 
   /**
    * 使用Cloudflare AI进行降级处理

@@ -1,0 +1,1054 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI资讯平台管理后台</title>
+    <link href="https://cdn.jsdelivr.net/npm/amis@1.10.2/sdk/sdk.css" rel="stylesheet"/>
+    <script src="https://cdn.jsdelivr.net/npm/amis@1.10.2/sdk/sdk.js"></script>
+    <style>
+        html, body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+        }
+        #root {
+            height: 100%;
+        }
+        .login-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #f5f5f5;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+    <script>
+        // 检查是否已登录
+        function isLoggedIn() {
+            return localStorage.getItem('admin_logged_in') === 'true';
+        }
+
+        // 登出函数
+        function logout() {
+            localStorage.removeItem('admin_logged_in');
+            renderLoginPage();
+        }
+
+        // 全局fetcher配置，添加认证头
+        const fetcher = (config) => {
+            console.log('Fetcher被调用，配置:', config);
+            // 添加认证头
+            const token = localStorage.getItem('admin_token');
+            console.log('从localStorage获取的令牌:', token);
+            if (token) {
+                config.headers = config.headers || {};
+                config.headers['Authorization'] = `Bearer ${token}`;
+                console.log('添加了认证头:', config.headers['Authorization']);
+            } else {
+                console.log('未找到认证令牌');
+            }
+            console.log('最终发送的配置:', config);
+            
+            // 使用axios发送请求
+            return amisRequire('axios')(config)
+                .then(response => {
+                    console.log('API响应:', response);
+                    return response;
+                })
+                .catch(error => {
+                    console.error('API错误:', error);
+                    throw error;
+                });
+        };
+        
+        // 渲染登录页面
+        function renderLoginPage() {
+            const loginPageConfig = {
+                type: 'page',
+                title: 'AI资讯平台管理后台 - 登录',
+                body: {
+                    type: 'form',
+                    api: {
+                        url: '/api/auth/admin-login',
+                        method: 'post',
+                        adaptor: function (payload, response) {
+                            console.log('登录请求发送的数据:', payload);
+                            console.log('后端返回的响应:', response);
+                            // 获取实际的响应数据
+                            const responseData = response.data || response;
+                            console.log('实际响应数据:', responseData);
+                            // 检查登录是否成功
+                            if (responseData.message === "管理员登录成功") {
+                                console.log('登录成功');
+                                // 登录成功，保存令牌
+                                localStorage.setItem('admin_logged_in', 'true');
+                                localStorage.setItem('admin_token', responseData.token);
+                                // 重新渲染主页面
+                                setTimeout(() => {
+                                    renderMainPage();
+                                }, 100);
+                                return {
+                                    status: 0,
+                                    msg: '登录成功',
+                                    data: {
+                                        token: responseData.token
+                                    }
+                                };
+                            } else {
+                                console.log('登录失败');
+                                return {
+                                    status: 1,
+                                    msg: responseData.message || '用户名或密码错误'
+                                };
+                            }
+                        }
+                    },
+                    redirect: '',
+                    body: [
+                        {
+                            type: 'input-text',
+                            name: 'username',
+                            label: '用户名',
+                            required: true,
+                            placeholder: '请输入用户名'
+                        },
+                        {
+                            type: 'input-password',
+                            name: 'password',
+                            label: '密码',
+                            required: true,
+                            placeholder: '请输入密码'
+                        }
+                    ],
+                    actions: [
+                        {
+                            type: 'submit',
+                            label: '登录',
+                            level: 'primary'
+                        }
+                    ]
+                }
+            };
+
+            const amis = amisRequire('amis/embed');
+            amis.embed('#root', loginPageConfig, {}, fetcher);
+        }
+
+        // 渲染主页面 - 使用条件渲染但避免重复请求
+        function renderMainPage() {
+            // 检查是否有有效的认证令牌
+            const token = localStorage.getItem('admin_token');
+            console.log('渲染主页面时检查令牌:', token);
+            if (!token) {
+                console.log('未找到令牌，重定向到登录页面');
+                renderLoginPage();
+                return;
+            }
+            console.log('找到令牌，渲染主页面');
+            
+            // 获取当前Hash路径
+            const hashPath = window.location.hash.substring(1) || '/home';
+            console.log('当前Hash路径:', hashPath);
+            
+            // 构建主页面配置 - 使用条件渲染避免重复初始化
+            const mainPageConfig = {
+                type: 'page',
+                title: 'AI资讯平台管理后台',
+                toolbar: {
+                    type: 'tpl',
+                    tpl: '<div class="pull-right"><button class="btn btn-link" onclick="logout()">登出</button></div>'
+                },
+                body: {
+                    type: 'grid',
+                    columns: [
+                        {
+                            md: 3,
+                            body: {
+                                type: 'wrapper',
+                                className: 'bg-light padder-v',
+                                body: {
+                                    type: 'nav',
+                                    stacked: true,
+                                    className: 'nav-pills nav-stacked',
+                                    links: [
+                                        {
+                                            label: '首页',
+                                            icon: 'fa fa-home',
+                                            to: '#/home',
+                                            active: hashPath === '/home'
+                                        },
+                                        {
+                                            label: '用户管理',
+                                            icon: 'fa fa-users',
+                                            to: '#/users',
+                                            active: hashPath === '/users'
+                                        },
+                                        {
+                                            label: 'RSS源管理',
+                                            icon: 'fa fa-rss',
+                                            to: '#/sources',
+                                            active: hashPath === '/sources'
+                                        },
+                                        {
+                                            label: '内容管理',
+                                            icon: 'fa fa-newspaper-o',
+                                            to: '#/contents',
+                                            active: hashPath === '/contents'
+                                        },
+                                        {
+                                            label: '系统监控',
+                                            icon: 'fa fa-dashboard',
+                                            to: '#/system',
+                                            active: hashPath === '/system'
+                                        }
+                                    ]
+                                }
+                            }
+                        },
+                        {
+                            md: 9,
+                            body: [
+                                {
+                                    type: 'wrapper',
+                                    visibleOn: `window.location.hash === "#/home"`,
+                                    body: getHomePageConfig().body
+                                },
+                                {
+                                    type: 'wrapper', 
+                                    visibleOn: `window.location.hash === "#/users"`,
+                                    body: getUsersPageConfig().body
+                                },
+                                {
+                                    type: 'wrapper',
+                                    visibleOn: `window.location.hash === "#/sources"`, 
+                                    body: getSourcesPageConfig().body
+                                },
+                                {
+                                    type: 'wrapper',
+                                    visibleOn: `window.location.hash === "#/contents"`,
+                                    body: getContentsPageConfig().body
+                                },
+                                {
+                                    type: 'wrapper',
+                                    visibleOn: `window.location.hash === "#/system"`,
+                                    body: getSystemPageConfig().body
+                                }
+                            ]
+                        }
+                    ]
+                }
+            };
+
+            console.log('主页面配置:', mainPageConfig);
+            console.log('开始渲染amis页面...');
+            
+            // 清理之前的实例，避免内存泄漏
+            const rootElement = document.getElementById('root');
+            if (window.amisInstance) {
+                try {
+                    console.log('销毁旧amis实例');
+                    window.amisInstance.destroy();
+                } catch (e) {
+                    console.log('销毁旧实例时出错:', e);
+                }
+            }
+            
+            // 清空DOM
+            rootElement.innerHTML = '';
+            
+            // 渲染新实例
+            const amis = amisRequire('amis/embed');
+            window.amisInstance = amis.embed('#root', mainPageConfig, {}, fetcher);
+            
+            console.log('amis页面渲染完成:', window.amisInstance);
+            
+            // 只有初次加载才设置默认Hash，避免循环
+            if (!window.location.hash || window.location.hash === '#') {
+                window.location.hash = '#/home';
+            }
+        }
+        
+        // 首页配置
+        function getHomePageConfig() {
+            return {
+                type: 'page',
+                title: '首页',
+                body: [
+                    {
+                        type: 'tpl',
+                        tpl: '<h3>欢迎使用AI资讯平台管理后台</h3><p>请选择左侧菜单进行操作</p>',
+                        inline: false
+                    }
+                ]
+            };
+        }
+        
+        // 用户管理页面配置
+        function getUsersPageConfig() {
+            return {
+                type: 'page',
+                title: '用户管理',
+                body: {
+                    type: 'crud',
+                    api: {
+                        method: 'get',
+                        url: '/api/users',
+                        headers: {
+                            'Authorization': 'Bearer ' + localStorage.getItem('admin_token')
+                        }
+                    },
+                    defaultParams: {
+                        perPage: 10
+                    },
+                    pageField: 'page',
+                    perPageField: 'perPage',
+                    loadDataOnce: false, // 启用分页，一次性加载所有数据
+                    interval: 0, // 禁用轮询
+                    silentPolling: false, // 禁用静默轮询
+                    stopAutoRefreshWhen: 'true', // 始终停止自动刷新
+                    syncLocation: true, // 启用URL同步以支持分页
+                    columns: [
+                        {
+                            name: 'id',
+                            label: 'ID',
+                            type: 'text'
+                        },
+                        {
+                            name: 'email',
+                            label: '邮箱',
+                            type: 'text'
+                        },
+                        {
+                            name: 'createdAt',
+                            label: '创建时间',
+                            type: 'datetime'
+                        },
+                        {
+                            type: 'operation',
+                            label: '操作',
+                            width: 160,
+                            buttons: [
+                                {
+                                    type: 'button',
+                                    label: '编辑',
+                                    level: 'info',
+                                    size: 'sm',
+                                    actionType: 'dialog',
+                                    dialog: {
+                                        title: '编辑用户',
+                                        body: {
+                                            type: 'form',
+                                            api: {
+                                                method: 'put',
+                                                url: '/api/users/${id}',
+                                                headers: {
+                                                    'Authorization': 'Bearer ' + localStorage.getItem('admin_token')
+                                                }
+                                            },
+                                            body: [
+                                                {
+                                                    type: 'input-text',
+                                                    name: 'email',
+                                                    label: '邮箱',
+                                                    required: true
+                                                },
+                                                {
+                                                    type: 'input-password',
+                                                    name: 'password',
+                                                    label: '密码',
+                                                    placeholder: '留空则不修改密码'
+                                                }
+                                            ]
+                                        }
+                                    }
+                                },
+                                {
+                                    type: 'button',
+                                    label: '删除',
+                                    level: 'danger',
+                                    size: 'sm',
+                                    actionType: 'ajax',
+                                    confirmText: '您确认要删除该用户?',
+                                    api: {
+                                        method: 'delete',
+                                        url: '/api/users/${id}',
+                                        headers: {
+                                            'Authorization': 'Bearer ' + localStorage.getItem('admin_token')
+                                        }
+                                    },
+                                    feedback: {
+                                        title: '删除成功',
+                                        body: '用户已成功删除'
+                                    }
+                                }
+                            ]
+                        }
+                    ],
+                    headerToolbar: [
+                        {
+                            type: 'button',
+                            label: '新增用户',
+                            actionType: 'dialog',
+                            dialog: {
+                                title: '新增用户',
+                                body: {
+                                    type: 'form',
+                                    api: {
+                                        method: 'post',
+                                        url: '/api/users',
+                                        headers: {
+                                            'Authorization': 'Bearer ' + localStorage.getItem('admin_token')
+                                        }
+                                    },
+                                    body: [
+                                        {
+                                            type: 'input-text',
+                                            name: 'email',
+                                            label: '邮箱',
+                                            required: true
+                                        },
+                                        {
+                                            type: 'input-password',
+                                            name: 'password',
+                                            label: '密码',
+                                            required: true
+                                        }
+                                    ]
+                                }
+                            }
+                        },
+                        'bulkActions',
+                        {
+                            type: 'pagination',
+                            align: 'right'
+                        }
+                    ],
+                    footerToolbar: [
+                        'statistics',
+                        {
+                            type: 'pagination',
+                            align: 'right'
+                        }
+                    ]
+                }
+            };
+        }
+        
+        // RSS源管理页面配置
+        function getSourcesPageConfig() {
+            return {
+                type: 'page',
+                title: 'RSS源管理',
+                body: {
+                    type: 'crud',
+                    api: {
+                        method: 'get',
+                        url: '/api/sources/my',
+                        headers: {
+                            'Authorization': 'Bearer ' + localStorage.getItem('admin_token')
+                        }
+                    },
+                    defaultParams: {
+                        perPage: 10
+                    },
+                    pageField: 'page',
+                    perPageField: 'perPage',
+                    loadDataOnce: false, // 启用分页
+                    interval: 0, // 禁用轮询
+                    silentPolling: false, // 禁用静默轮询
+                    stopAutoRefreshWhen: 'true', // 始终停止自动刷新
+                    syncLocation: true, // 启用URL同步以支持分页
+                    columns: [
+                        {
+                            name: 'id',
+                            label: 'ID',
+                            type: 'text'
+                        },
+                        {
+                            name: 'name',
+                            label: '名称',
+                            type: 'text'
+                        },
+                        {
+                            name: 'url',
+                            label: 'URL',
+                            type: 'text'
+                        },
+                        {
+                            name: 'isPublic',
+                            label: '是否公开',
+                            type: 'mapping',
+                            map: {
+                                '1': '<span class="label label-success">是</span>',
+                                '0': '<span class="label label-default">否</span>'
+                            }
+                        },
+                        {
+                            name: 'lastFetchedAt',
+                            label: '上次获取时间',
+                            type: 'datetime'
+                        },
+                        {
+                            name: 'fetchFailureCount',
+                            label: '失败次数',
+                            type: 'text'
+                        },
+                        {
+                            type: 'operation',
+                            label: '操作',
+                            width: 260,
+                            buttons: [
+                                {
+                                    type: 'button',
+                                    label: '抓取',
+                                    level: 'primary',
+                                    size: 'xs',
+                                    icon: 'fa fa-refresh',
+                                    actionType: 'ajax',
+                                    api: {
+                                        method: 'post',
+                                        url: '/api/sources/${id}/trigger-fetch',
+                                        headers: {
+                                            'Authorization': 'Bearer ' + localStorage.getItem('admin_token')
+                                        }
+                                    },
+                                    confirmText: '确认手动触发抓取该RSS源？',
+                                    feedback: {
+                                        title: '抓取触发成功',
+                                        body: 'RSS抓取任务已添加到队列中'
+                                    }
+                                },
+                                {
+                                    type: 'button',
+                                    label: '内容',
+                                    level: 'info',
+                                    size: 'xs',
+                                    icon: 'fa fa-list',
+                                    actionType: 'dialog',
+                                    dialog: {
+                                        title: 'RSS内容列表 - ${name}',
+                                        size: 'xl',
+                                        body: {
+                                            type: 'crud',
+                                            api: {
+                                                method: 'get',
+                                                url: '/api/sources/${id}/entries',
+                                                headers: {
+                                                    'Authorization': 'Bearer ' + localStorage.getItem('admin_token')
+                                                }
+                                            },
+                                            defaultParams: {
+                                                perPage: 10
+                                            },
+                                            pageField: 'page',
+                                            perPageField: 'perPage',
+                                            interval: 0, // 禁用轮询
+                                            silentPolling: false,
+                                            stopAutoRefreshWhen: 'true',
+                                            syncLocation: true, // 启用URL同步以支持分页
+                                            columns: [
+                                                {
+                                                    name: 'id',
+                                                    label: 'ID',
+                                                    type: 'text',
+                                                    width: 60
+                                                },
+                                                {
+                                                    name: 'title',
+                                                    label: '标题',
+                                                    type: 'text'
+                                                },
+                                                {
+                                                    name: 'publishedAt',
+                                                    label: '发布时间',
+                                                    type: 'datetime',
+                                                    width: 150
+                                                },
+                                                {
+                                                    name: 'processed',
+                                                    label: '处理状态',
+                                                    type: 'mapping',
+                                                    map: {
+                                                        '1': '<span class="label label-success">已处理</span>',
+                                                        '0': '<span class="label label-warning">未处理</span>'
+                                                    },
+                                                    width: 100
+                                                },
+                                                {
+                                                    name: 'failureCount',
+                                                    label: '失败次数',
+                                                    type: 'text',
+                                                    width: 80
+                                                },
+                                                {
+                                                    type: 'operation',
+                                                    label: '操作',
+                                                    width: 80,
+                                                    buttons: [
+                                                        {
+                                                            type: 'button',
+                                                            label: '详情',
+                                                            level: 'link',
+                                                            size: 'xs',
+                                                            actionType: 'dialog',
+                                                            dialog: {
+                                                                title: '内容详情 - ${title}',
+                                                                size: 'lg',
+                                                                body: {
+                                                                    type: 'form',
+                                                                    mode: 'normal',
+                                                                    body: [
+                                                                        {
+                                                                            type: 'static',
+                                                                            name: 'title',
+                                                                            label: '标题'
+                                                                        },
+                                                                        {
+                                                                            type: 'static',
+                                                                            name: 'link',
+                                                                            label: '链接'
+                                                                        },
+                                                                        {
+                                                                            type: 'static',
+                                                                            name: 'publishedAt',
+                                                                            label: '发布时间',
+                                                                            format: 'YYYY-MM-DD HH:mm:ss'
+                                                                        },
+                                                                        {
+                                                                            type: 'static',
+                                                                            name: 'processed',
+                                                                            label: '处理状态',
+                                                                            tpl: '${processed ? "已处理" : "未处理"}'
+                                                                        },
+                                                                        {
+                                                                            type: 'static',
+                                                                            name: 'content',
+                                                                            label: '内容',
+                                                                            tpl: '<div style="max-height: 300px; overflow-y: auto; white-space: pre-wrap;">${content}</div>'
+                                                                        }
+                                                                    ]
+                                                                }
+                                                            }
+                                                        }
+                                                    ]
+                                                }
+                                            ]
+                                        }
+                                    }
+                                },
+                                {
+                                    type: 'button',
+                                    label: '编辑',
+                                    level: 'warning',
+                                    size: 'xs',
+                                    icon: 'fa fa-edit',
+                                    actionType: 'dialog',
+                                    dialog: {
+                                        title: '编辑RSS源',
+                                        body: {
+                                            type: 'form',
+                                            api: {
+                                                method: 'put',
+                                                url: '/api/sources/${id}',
+                                                headers: {
+                                                    'Authorization': 'Bearer ' + localStorage.getItem('admin_token')
+                                                }
+                                            },
+                                            body: [
+                                                {
+                                                    type: 'input-text',
+                                                    name: 'name',
+                                                    label: '名称',
+                                                    required: true
+                                                },
+                                                {
+                                                    type: 'input-text',
+                                                    name: 'url',
+                                                    label: 'URL',
+                                                    required: true
+                                                },
+                                                {
+                                                    type: 'input-text',
+                                                    name: 'description',
+                                                    label: '描述'
+                                                },
+                                                {
+                                                    type: 'switch',
+                                                    name: 'isPublic',
+                                                    label: '是否公开',
+                                                    trueValue: true,
+                                                    falseValue: false
+                                                }
+                                            ]
+                                        }
+                                    }
+                                },
+                                {
+                                    type: 'button',
+                                    label: '删除',
+                                    level: 'danger',
+                                    size: 'xs',
+                                    icon: 'fa fa-trash',
+                                    actionType: 'ajax',
+                                    confirmText: '您确认要删除该RSS源?',
+                                    api: {
+                                        method: 'delete',
+                                        url: '/api/sources/${id}',
+                                        headers: {
+                                            'Authorization': 'Bearer ' + localStorage.getItem('admin_token')
+                                        }
+                                    },
+                                    feedback: {
+                                        title: '删除成功',
+                                        body: 'RSS源已成功删除'
+                                    }
+                                }
+                            ]
+                        }
+                    ],
+                    headerToolbar: [
+                        {
+                            type: 'button',
+                            label: '新增RSS源',
+                            actionType: 'dialog',
+                            dialog: {
+                                title: '新增RSS源',
+                                body: {
+                                    type: 'form',
+                                    api: {
+                                        method: 'post',
+                                        url: '/api/sources',
+                                        headers: {
+                                            'Authorization': 'Bearer ' + localStorage.getItem('admin_token')
+                                        }
+                                    },
+                                    body: [
+                                        {
+                                            type: 'input-text',
+                                            name: 'name',
+                                            label: '名称',
+                                            required: true
+                                        },
+                                        {
+                                            type: 'input-text',
+                                            name: 'url',
+                                            label: 'URL',
+                                            required: true
+                                        },
+                                        {
+                                            type: 'input-text',
+                                            name: 'description',
+                                            label: '描述'
+                                        },
+                                        {
+                                            type: 'switch',
+                                            name: 'isPublic',
+                                            label: '是否公开',
+                                            trueValue: true,
+                                            falseValue: false
+                                        }
+                                    ]
+                                }
+                            }
+                        },
+                        'bulkActions',
+                        {
+                            type: 'pagination',
+                            align: 'right'
+                        }
+                    ],
+                    footerToolbar: [
+                        'statistics',
+                        {
+                            type: 'pagination',
+                            align: 'right'
+                        }
+                    ]
+                }
+            };
+        }
+        
+        // 系统监控页面配置
+        function getSystemPageConfig() {
+            return {
+                type: 'page',
+                title: '系统监控',
+                body: {
+                    type: 'service',
+                    api: {
+                        method: 'get',
+                        url: '/api/system/stats',
+                        headers: {
+                            'Authorization': 'Bearer ' + localStorage.getItem('admin_token')
+                        },
+                        cache: 0 // 禁用缓存
+                    },
+                    interval: 0, // 禁用轮询
+                    body: [
+                        {
+                            type: 'grid',
+                            columns: [
+                                {
+                                    type: 'panel',
+                                    title: '用户总数',
+                                    body: {
+                                        type: 'tpl',
+                                        tpl: '<h2>${userCount}</h2><p>用户</p>'
+                                    }
+                                },
+                                {
+                                    type: 'panel',
+                                    title: 'RSS源总数',
+                                    body: {
+                                        type: 'tpl',
+                                        tpl: '<h2>${sourceCount}</h2><p>RSS源</p>'
+                                    }
+                                },
+                                {
+                                    type: 'panel',
+                                    title: '失败源数量',
+                                    body: {
+                                        type: 'tpl',
+                                        tpl: '<h2>${failedSourceCount}</h2><p>失败源</p>'
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                }
+            };
+        }
+        
+        // 内容管理页面配置
+        function getContentsPageConfig() {
+            return {
+                type: 'page',
+                title: '内容管理',
+                body: {
+                    type: 'crud',
+                    api: {
+                        method: 'get',
+                        url: '/api/sources/entries/all',
+                        headers: {
+                            'Authorization': 'Bearer ' + localStorage.getItem('admin_token')
+                        }
+                    },
+                    defaultParams: {
+                        perPage: 20
+                    },
+                    pageField: 'page',
+                    perPageField: 'perPage',
+                    interval: 0, // 禁用轮询
+                    silentPolling: false,
+                    stopAutoRefreshWhen: 'true',
+                    syncLocation: true, // 启用URL同步以支持分页
+                    columns: [
+                        {
+                            name: 'id',
+                            label: 'ID',
+                            type: 'text',
+                            width: 60
+                        },
+                        {
+                            name: 'sourceName',
+                            label: 'RSS源',
+                            type: 'text',
+                            width: 120
+                        },
+                        {
+                            name: 'title',
+                            label: '标题',
+                            type: 'text'
+                        },
+                        {
+                            name: 'content',
+                            label: '内容预览',
+                            type: 'text',
+                            width: 200
+                        },
+                        {
+                            name: 'publishedAt',
+                            label: '发布时间',
+                            type: 'datetime',
+                            width: 150
+                        },
+                        {
+                            name: 'processed',
+                            label: '处理状态',
+                            type: 'mapping',
+                            map: {
+                                '1': '<span class="label label-success">已处理</span>',
+                                '0': '<span class="label label-warning">未处理</span>'
+                            },
+                            width: 100
+                        },
+                        {
+                            name: 'failureCount',
+                            label: '失败次数',
+                            type: 'text',
+                            width: 80
+                        },
+                        {
+                            type: 'operation',
+                            label: '操作',
+                            width: 120,
+                            buttons: [
+                                {
+                                    type: 'button',
+                                    label: '详情',
+                                    level: 'info',
+                                    size: 'xs',
+                                    icon: 'fa fa-eye',
+                                    actionType: 'dialog',
+                                    dialog: {
+                                        title: '内容详情 - ${title}',
+                                        size: 'xl',
+                                        body: {
+                                            type: 'tabs',
+                                            tabs: [
+                                                {
+                                                    title: '基本信息',
+                                                    body: {
+                                                        type: 'form',
+                                                        mode: 'normal',
+                                                        body: [
+                                                            {
+                                                                type: 'static',
+                                                                name: 'id',
+                                                                label: 'ID'
+                                                            },
+                                                            {
+                                                                type: 'static',
+                                                                name: 'sourceName',
+                                                                label: 'RSS源'
+                                                            },
+                                                            {
+                                                                type: 'static',
+                                                                name: 'title',
+                                                                label: '标题'
+                                                            },
+                                                            {
+                                                                type: 'static',
+                                                                name: 'link',
+                                                                label: '链接',
+                                                                tpl: '<a href="${link}" target="_blank">${link}</a>'
+                                                            },
+                                                            {
+                                                                type: 'static',
+                                                                name: 'publishedAt',
+                                                                label: '发布时间',
+                                                                format: 'YYYY-MM-DD HH:mm:ss'
+                                                            },
+                                                            {
+                                                                type: 'static',
+                                                                name: 'processed',
+                                                                label: '处理状态',
+                                                                tpl: '${processed ? "已处理" : "未处理"}'
+                                                            },
+                                                            {
+                                                                type: 'static',
+                                                                name: 'failureCount',
+                                                                label: '失败次数'
+                                                            },
+                                                            {
+                                                                type: 'static',
+                                                                name: 'errorMessage',
+                                                                label: '错误信息',
+                                                                visibleOn: '${errorMessage}',
+                                                                tpl: '<span class="text-danger">${errorMessage}</span>'
+                                                            },
+                                                            {
+                                                                type: 'static',
+                                                                name: 'createdAt',
+                                                                label: '抓取时间',
+                                                                format: 'YYYY-MM-DD HH:mm:ss'
+                                                            }
+                                                        ]
+                                                    }
+                                                },
+                                                {
+                                                    title: '原始内容',
+                                                    body: {
+                                                        type: 'form',
+                                                        mode: 'normal',
+                                                        body: [
+                                                            {
+                                                                type: 'static',
+                                                                name: 'content',
+                                                                label: '内容',
+                                                                tpl: '<div style="max-height: 500px; overflow-y: auto; white-space: pre-wrap; border: 1px solid #ddd; padding: 10px; background-color: #f9f9f9;">${content|raw}</div>'
+                                                            }
+                                                        ]
+                                                    }
+                                                }
+                                            ]
+                                        }
+                                    }
+                                },
+                                {
+                                    type: 'button',
+                                    label: '访问',
+                                    level: 'success',
+                                    size: 'xs',
+                                    icon: 'fa fa-external-link',
+                                    actionType: 'url',
+                                    url: '${link}',
+                                    blank: true
+                                }
+                            ]
+                        }
+                    ],
+                    headerToolbar: [
+                        {
+                            type: 'columns-toggler',
+                            align: 'left'
+                        },
+                        {
+                            type: 'drag-toggler',
+                            align: 'left'
+                        },
+                        {
+                            type: 'pagination',
+                            align: 'right'
+                        }
+                    ],
+                    footerToolbar: [
+                        'statistics',
+                        {
+                            type: 'pagination',
+                            align: 'right'
+                        }
+                    ]
+                }
+            };
+        }
+
+        // 全局登出函数
+        window.logout = logout;
+
+        // Hash变化监听器 - 重新渲染页面以触发amis的visibleOn重新计算
+        function handleHashChange() {
+            console.log('Hash变化检测:', window.location.hash);
+            // 需要重新渲染amis实例才能让visibleOn重新计算
+            renderMainPage();
+        }
+
+        // 页面加载时检查登录状态并初始化
+        if (isLoggedIn()) {
+            console.log('用户已登录，初始化主页面');
+            renderMainPage();
+            
+            // 绑定Hash变化监听器
+            console.log('绑定Hash变化监听器');
+            window.addEventListener('hashchange', handleHashChange);
+        } else {
+            console.log('用户未登录，显示登录页面');
+            renderLoginPage();
+        }
+    </script>
+</body>
+</html>

@@ -1,4 +1,4 @@
-import { db } from '../index';
+import { initDB } from '../../db/index';
 import { 
   interestCategories, 
   userInterests, 
@@ -6,7 +6,7 @@ import {
   onboardingStatuses,
   sources 
 } from '../../db/schema';
-import { eq, and, or, isNull, inArray, desc, sql } from 'drizzle-orm';
+import { eq, and, or, isNull, inArray, desc, sql, asc } from 'drizzle-orm';
 
 export interface InterestCategory {
   id: number;
@@ -94,12 +94,18 @@ export interface OnboardingStep {
 }
 
 export class OnboardingService {
+  constructor(private db: any = null) {}
   /**
    * 获取所有兴趣分类
    */
-  async getInterestCategories(): Promise<InterestCategory[]> {
+  async getInterestCategories(dbConnection?: any): Promise<InterestCategory[]> {
     try {
-      const categories = await db
+      const database = dbConnection || this.db;
+      if (!database) {
+        throw new Error('Database connection not provided');
+      }
+
+      const categories = await database
         .select()
         .from(interestCategories)
         .where(eq(interestCategories.isActive, true))
@@ -118,9 +124,14 @@ export class OnboardingService {
   /**
    * 获取用户兴趣
    */
-  async getUserInterests(userId: number): Promise<UserInterest[]> {
+  async getUserInterests(userId: number, dbConnection?: any): Promise<UserInterest[]> {
     try {
-      const interests = await db
+      const database = dbConnection || this.db;
+      if (!database) {
+        throw new Error('Database connection not provided');
+      }
+
+      const interests = await database
         .select()
         .from(userInterests)
         .where(and(eq(userInterests.userId, userId), eq(userInterests.isActive, true)))
@@ -136,10 +147,15 @@ export class OnboardingService {
   /**
    * 保存用户兴趣
    */
-  async saveUserInterests(userId: number, interests: InterestInput[]): Promise<void> {
+  async saveUserInterests(userId: number, interests: InterestInput[], dbConnection?: any): Promise<void> {
     try {
+      const database = dbConnection || this.db;
+      if (!database) {
+        throw new Error('Database connection not provided');
+      }
+
       // 开始事务
-      await db.transaction(async (tx) => {
+      await database.transaction(async (tx) => {
         // 先停用用户现有的兴趣
         await tx
           .update(userInterests)
@@ -169,7 +185,7 @@ export class OnboardingService {
         await this.updateOnboardingStatus(userId, {
           step: 'interests',
           selectedInterests: interests.map(i => i.categoryId),
-        });
+        }, database);
       });
 
       console.log(`用户 ${userId} 的兴趣保存成功`);
@@ -182,11 +198,16 @@ export class OnboardingService {
   /**
    * 基于用户兴趣推荐RSS源
    */
-  async recommendSources(userId: number, interests: InterestInput[]): Promise<RecommendedSource[]> {
+  async recommendSources(userId: number, interests: InterestInput[], dbConnection?: any): Promise<RecommendedSource[]> {
     try {
+      const database = dbConnection || this.db;
+      if (!database) {
+        throw new Error('Database connection not provided');
+      }
+
       // 1. 获取兴趣分类的映射关系
       const categoryIds = interests.map(i => parseInt(i.categoryId));
-      const mappings = await db
+      const mappings = await database
         .select({
           id: interestSourceMappings.id,
           categoryId: interestSourceMappings.categoryId,
@@ -204,7 +225,7 @@ export class OnboardingService {
 
       // 2. 获取推荐的源详情
       const sourceIds = mappings.map(m => m.sourceId);
-      const recommendedSources = await db
+      const recommendedSources = await database
         .select()
         .from(sources)
         .where(
@@ -261,7 +282,7 @@ export class OnboardingService {
       await this.updateOnboardingStatus(userId, {
         step: 'recommendations',
         recommendedSources: results.map(s => s.id.toString()),
-      });
+      }, database);
 
       return results;
     } catch (error) {
@@ -273,13 +294,18 @@ export class OnboardingService {
   /**
    * 确认用户选择的RSS源
    */
-  async confirmSources(userId: number, sourceIds: string[]): Promise<{ success: boolean; importedCount: number }> {
+  async confirmSources(userId: number, sourceIds: string[], dbConnection?: any): Promise<{ success: boolean; importedCount: number }> {
     try {
+      const database = dbConnection || this.db;
+      if (!database) {
+        throw new Error('Database connection not provided');
+      }
+
       // 1. 将选中的源添加到用户的RSS源列表
       const numericSourceIds = sourceIds.map(id => parseInt(id));
       
       // 获取推荐的源详情
-      const recommendedSources = await db
+      const recommendedSources = await database
         .select()
         .from(sources)
         .where(inArray(sources.id, numericSourceIds));
@@ -289,7 +315,7 @@ export class OnboardingService {
       for (const source of recommendedSources) {
         try {
           // 检查用户是否已经订阅了这个源
-          const existingSubscription = await db
+          const existingSubscription = await database
             .select()
             .from(sources)
             .where(
@@ -304,7 +330,7 @@ export class OnboardingService {
             .limit(1);
 
           if (existingSubscription.length === 0) {
-            await db.insert(sources).values({
+            await database.insert(sources).values({
               userId,
               url: source.url,
               name: source.name,
@@ -326,7 +352,7 @@ export class OnboardingService {
       await this.updateOnboardingStatus(userId, {
         step: 'confirmation',
         confirmedSources: sourceIds,
-      });
+      }, database);
 
       console.log(`用户 ${userId} 确认了 ${importedCount} 个RSS源`);
       
@@ -343,12 +369,17 @@ export class OnboardingService {
   /**
    * 更新引导状态
    */
-  async updateOnboardingStatus(userId: number, update: OnboardingStep): Promise<OnboardingStatus> {
+  async updateOnboardingStatus(userId: number, update: OnboardingStep, dbConnection?: any): Promise<OnboardingStatus> {
     try {
+      const database = dbConnection || this.db;
+      if (!database) {
+        throw new Error('Database connection not provided');
+      }
+
       const now = new Date();
       
       // 检查是否已有引导状态记录
-      let [status] = await db
+      let [status] = await database
         .select()
         .from(onboardingStatuses)
         .where(eq(onboardingStatuses.userId, userId))
@@ -356,7 +387,7 @@ export class OnboardingService {
 
       if (!status) {
         // 创建新的引导状态
-        [status] = await db
+        [status] = await database
           .insert(onboardingStatuses)
           .values({
             userId,
@@ -373,7 +404,7 @@ export class OnboardingService {
           .returning();
       } else {
         // 更新现有状态
-        [status] = await db
+        [status] = await database
           .update(onboardingStatuses)
           .set({
             step: update.step,
@@ -406,13 +437,18 @@ export class OnboardingService {
   /**
    * 跳过引导流程
    */
-  async skipOnboarding(userId: number): Promise<{ success: boolean }> {
+  async skipOnboarding(userId: number, dbConnection?: any): Promise<{ success: boolean }> {
     try {
+      const database = dbConnection || this.db;
+      if (!database) {
+        throw new Error('Database connection not provided');
+      }
+
       const now = new Date();
       
       await this.updateOnboardingStatus(userId, {
         step: 'skipped',
-      });
+      }, database);
 
       console.log(`用户 ${userId} 跳过了引导流程`);
       return { success: true };
@@ -425,13 +461,18 @@ export class OnboardingService {
   /**
    * 完成引导流程
    */
-  async completeOnboarding(userId: number): Promise<{ success: boolean }> {
+  async completeOnboarding(userId: number, dbConnection?: any): Promise<{ success: boolean }> {
     try {
+      const database = dbConnection || this.db;
+      if (!database) {
+        throw new Error('Database connection not provided');
+      }
+
       const now = new Date();
       
       await this.updateOnboardingStatus(userId, {
         step: 'completed',
-      });
+      }, database);
 
       console.log(`用户 ${userId} 完成了引导流程`);
       return { success: true };
@@ -444,9 +485,14 @@ export class OnboardingService {
   /**
    * 获取用户引导状态
    */
-  async getOnboardingStatus(userId: number): Promise<OnboardingStatus | null> {
+  async getOnboardingStatus(userId: number, dbConnection?: any): Promise<OnboardingStatus | null> {
     try {
-      const [status] = await db
+      const database = dbConnection || this.db;
+      if (!database) {
+        throw new Error('Database connection not provided');
+      }
+
+      const [status] = await database
         .select()
         .from(onboardingStatuses)
         .where(eq(onboardingStatuses.userId, userId))
@@ -471,9 +517,14 @@ export class OnboardingService {
   /**
    * 检查用户是否需要引导
    */
-  async needsOnboarding(userId: number): Promise<boolean> {
+  async needsOnboarding(userId: number, dbConnection?: any): Promise<boolean> {
     try {
-      const [status] = await db
+      const database = dbConnection || this.db;
+      if (!database) {
+        throw new Error('Database connection not provided');
+      }
+
+      const [status] = await database
         .select()
         .from(onboardingStatuses)
         .where(eq(onboardingStatuses.userId, userId))
@@ -490,14 +541,19 @@ export class OnboardingService {
   /**
    * 获取引导进度
    */
-  async getOnboardingProgress(userId: number): Promise<{
+  async getOnboardingProgress(userId: number, dbConnection?: any): Promise<{
     currentStep: number;
     totalSteps: number;
     stepName: string;
     progress: number;
   }> {
     try {
-      const status = await this.getOnboardingStatus(userId);
+      const database = dbConnection || this.db;
+      if (!database) {
+        throw new Error('Database connection not provided');
+      }
+
+      const status = await this.getOnboardingStatus(userId, database);
       
       if (!status) {
         return {
@@ -550,11 +606,16 @@ export class OnboardingService {
   /**
    * 初始化引导流程
    */
-  async initializeOnboarding(userId: number): Promise<OnboardingStatus> {
+  async initializeOnboarding(userId: number, dbConnection?: any): Promise<OnboardingStatus> {
     try {
+      const database = dbConnection || this.db;
+      if (!database) {
+        throw new Error('Database connection not provided');
+      }
+
       const now = new Date();
       
-      const [status] = await db
+      const [status] = await database
         .insert(onboardingStatuses)
         .values({
           userId,
@@ -578,10 +639,15 @@ export class OnboardingService {
   /**
    * 获取热门兴趣分类
    */
-  async getPopularCategories(limit: number = 10): Promise<InterestCategory[]> {
+  async getPopularCategories(limit: number = 10, dbConnection?: any): Promise<InterestCategory[]> {
     try {
+      const database = dbConnection || this.db;
+      if (!database) {
+        throw new Error('Database connection not provided');
+      }
+
       // 获取有最多用户选择的分类
-      const popularCategories = await db
+      const popularCategories = await database
         .select({
           id: interestCategories.id,
           name: interestCategories.name,

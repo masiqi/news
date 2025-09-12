@@ -5,6 +5,7 @@ import { sources, rssEntries, processedContents } from "../db/schema";
 import { SourceService } from "../services/source.service";
 import { ContentCacheService } from "../services/content-cache.service";
 import { RssSchedulerService } from "../services/rss-scheduler.service";
+import { requireAuth, getAuthUser } from "../middleware/auth";
 import type { Source, NewSource } from "../db/types";
 
 const sourceRoutes = new Hono<{ Bindings: CloudflareBindings }>();
@@ -30,22 +31,15 @@ sourceRoutes.get("/public", async (c) => {
 });
 
 // 获取当前用户的所有RSS源
-sourceRoutes.get("/my", async (c) => {
+sourceRoutes.get("/my", requireAuth, async (c) => {
   try {
-    // 从JWT令牌中获取用户ID
-    const authHeader = c.req.header('Authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return c.json({ error: "未提供有效的认证令牌" }, 401);
+    const user = getAuthUser(c);
+    if (!user) {
+      return c.json({ error: "用户未认证" }, 401);
     }
 
-    // 这里应该验证JWT令牌并提取用户ID
-    // 简化处理，实际应用中应该使用jwt库验证令牌
-    const token = authHeader.substring(7); // 移除 "Bearer " 前缀
-    // 临时解决方案：从令牌中提取用户ID（简化处理）
-    const userId = token.includes('user2') ? 2 : 1; // 示例用户ID，实际应该从令牌中提取
-
     const sourceService = c.get('sourceService') as SourceService;
-    const userSources = await sourceService.getUserSources(userId);
+    const userSources = await sourceService.getUserSources(user.id);
     return c.json({ sources: userSources }, 200);
   } catch (error) {
     console.error("获取用户RSS源错误:", error);
@@ -54,19 +48,12 @@ sourceRoutes.get("/my", async (c) => {
 });
 
 // 创建新的RSS源
-sourceRoutes.post("/", async (c) => {
+sourceRoutes.post("/", requireAuth, async (c) => {
   try {
-    // 从JWT令牌中获取用户ID
-    const authHeader = c.req.header('Authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return c.json({ error: "未提供有效的认证令牌" }, 401);
+    const user = getAuthUser(c);
+    if (!user) {
+      return c.json({ error: "用户未认证" }, 401);
     }
-
-    // 这里应该验证JWT令牌并提取用户ID
-    // 简化处理，实际应用中应该使用jwt库验证令牌
-    const token = authHeader.substring(7); // 移除 "Bearer " 前缀
-    // 临时解决方案：从令牌中提取用户ID（简化处理）
-    const userId = token.includes('user2') ? 2 : 1; // 示例用户ID，实际应该从令牌中提取
 
     const body = await c.req.json();
     const { url, name, description, isPublic } = body;
@@ -77,7 +64,7 @@ sourceRoutes.post("/", async (c) => {
     }
 
     const newSource: NewSource = {
-      userId,
+      userId: user.id,
       url,
       name,
       description: description || null,
@@ -95,19 +82,12 @@ sourceRoutes.post("/", async (c) => {
 });
 
 // 复制公共RSS源到用户账户
-sourceRoutes.post("/:id/copy", async (c) => {
+sourceRoutes.post("/:id/copy", requireAuth, async (c) => {
   try {
-    // 从JWT令牌中获取用户ID
-    const authHeader = c.req.header('Authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return c.json({ error: "未提供有效的认证令牌" }, 401);
+    const user = getAuthUser(c);
+    if (!user) {
+      return c.json({ error: "用户未认证" }, 401);
     }
-
-    // 这里应该验证JWT令牌并提取用户ID
-    // 简化处理，实际应用中应该使用jwt库验证令牌
-    const token = authHeader.substring(7); // 移除 "Bearer " 前缀
-    // 临时解决方案：从令牌中提取用户ID（简化处理）
-    const userId = token.includes('user2') ? 2 : 1; // 示例用户ID，实际应该从令牌中提取
 
     const sourceId = parseInt(c.req.param("id"));
     if (isNaN(sourceId)) {
@@ -115,7 +95,7 @@ sourceRoutes.post("/:id/copy", async (c) => {
     }
 
     const sourceService = c.get('sourceService') as SourceService;
-    const copiedSource = await sourceService.copySource(sourceId, userId);
+    const copiedSource = await sourceService.copySource(sourceId, user.id);
     
     if (!copiedSource) {
       return c.json({ error: "无法复制源，源可能不存在或不是公共源" }, 404);
@@ -129,19 +109,12 @@ sourceRoutes.post("/:id/copy", async (c) => {
 });
 
 // 更新RSS源
-sourceRoutes.put("/:id", async (c) => {
+sourceRoutes.put("/:id", requireAuth, async (c) => {
   try {
-    // 从JWT令牌中获取用户ID
-    const authHeader = c.req.header('Authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return c.json({ error: "未提供有效的认证令牌" }, 401);
+    const user = getAuthUser(c);
+    if (!user) {
+      return c.json({ error: "用户未认证" }, 401);
     }
-
-    // 这里应该验证JWT令牌并提取用户ID
-    // 简化处理，实际应用中应该使用jwt库验证令牌
-    const token = authHeader.substring(7); // 移除 "Bearer " 前缀
-    // 临时解决方案：从令牌中提取用户ID（简化处理）
-    const userId = token.includes('user2') ? 2 : 1; // 示例用户ID，实际应该从令牌中提取
 
     const sourceId = parseInt(c.req.param("id"));
     if (isNaN(sourceId)) {
@@ -152,7 +125,7 @@ sourceRoutes.put("/:id", async (c) => {
     const { url, name, description, isPublic } = body;
 
     const sourceService = c.get('sourceService') as SourceService;
-    const updatedSource = await sourceService.updateSource(sourceId, { url, name, description, isPublic }, userId);
+    const updatedSource = await sourceService.updateSource(sourceId, { url, name, description, isPublic }, user.id);
     
     if (!updatedSource) {
       return c.json({ error: "无法更新源，源可能不存在或无权限" }, 404);
@@ -166,19 +139,12 @@ sourceRoutes.put("/:id", async (c) => {
 });
 
 // 删除RSS源
-sourceRoutes.delete("/:id", async (c) => {
+sourceRoutes.delete("/:id", requireAuth, async (c) => {
   try {
-    // 从JWT令牌中获取用户ID
-    const authHeader = c.req.header('Authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return c.json({ error: "未提供有效的认证令牌" }, 401);
+    const user = getAuthUser(c);
+    if (!user) {
+      return c.json({ error: "用户未认证" }, 401);
     }
-
-    // 这里应该验证JWT令牌并提取用户ID
-    // 简化处理，实际应用中应该使用jwt库验证令牌
-    const token = authHeader.substring(7); // 移除 "Bearer " 前缀
-    // 临时解决方案：从令牌中提取用户ID（简化处理）
-    const userId = token.includes('user2') ? 2 : 1; // 示例用户ID，实际应该从令牌中提取
 
     const sourceId = parseInt(c.req.param("id"));
     if (isNaN(sourceId)) {
@@ -186,7 +152,7 @@ sourceRoutes.delete("/:id", async (c) => {
     }
 
     const sourceService = c.get('sourceService') as SourceService;
-    const deleted = await sourceService.deleteSource(sourceId, userId);
+    const deleted = await sourceService.deleteSource(sourceId, user.id);
     
     if (!deleted) {
       return c.json({ error: "无法删除源，源可能不存在或无权限" }, 404);
@@ -200,40 +166,46 @@ sourceRoutes.delete("/:id", async (c) => {
 });
 
 // 手动触发RSS源抓取
-sourceRoutes.post("/:id/trigger-fetch", async (c) => {
+sourceRoutes.post("/:id/trigger-fetch", requireAuth, async (c) => {
   try {
-    // 从JWT令牌中获取用户ID
-    const authHeader = c.req.header('Authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return c.json({ error: "未提供有效的认证令牌" }, 401);
+    console.log(`后端API: 收到RSS源触发获取请求`);
+    
+    const user = getAuthUser(c);
+    if (!user) {
+      console.log(`后端API: 用户未认证`);
+      return c.json({ error: "用户未认证" }, 401);
     }
 
     const sourceId = parseInt(c.req.param("id"));
     if (isNaN(sourceId)) {
+      console.log(`后端API: 无效的源ID: ${c.req.param("id")}`);
       return c.json({ error: "无效的源ID" }, 400);
     }
+
+    console.log(`后端API: 用户 ${user.email} 请求触发RSS源 ${sourceId} 获取`);
 
     const rssSchedulerService = c.get('rssSchedulerService') as RssSchedulerService;
     const success = await rssSchedulerService.triggerSourceFetch(sourceId);
     
     if (!success) {
+      console.log(`后端API: 触发RSS源 ${sourceId} 获取失败`);
       return c.json({ error: "无法触发抓取，源可能不存在" }, 404);
     }
 
+    console.log(`后端API: 成功触发RSS源 ${sourceId} 获取`);
     return c.json({ message: "手动抓取已触发", sourceId }, 200);
   } catch (error) {
-    console.error("触发RSS源抓取错误:", error);
+    console.error("后端API: 触发RSS源抓取错误:", error);
     return c.json({ error: "服务器内部错误" }, 500);
   }
 });
 
 // 获取RSS源的抓取内容列表
-sourceRoutes.get("/:id/entries", async (c) => {
+sourceRoutes.get("/:id/entries", requireAuth, async (c) => {
   try {
-    // 从JWT令牌中获取用户ID
-    const authHeader = c.req.header('Authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return c.json({ error: "未提供有效的认证令牌" }, 401);
+    const user = getAuthUser(c);
+    if (!user) {
+      return c.json({ error: "用户未认证" }, 401);
     }
 
     const sourceId = parseInt(c.req.param("id"));
@@ -268,12 +240,11 @@ sourceRoutes.get("/:id/entries", async (c) => {
 });
 
 // 获取所有RSS条目（管理后台用）
-sourceRoutes.get("/entries/all", async (c) => {
+sourceRoutes.get("/entries/all", requireAuth, async (c) => {
   try {
-    // 从JWT令牌中获取用户ID
-    const authHeader = c.req.header('Authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return c.json({ error: "未提供有效的认证令牌" }, 401);
+    const user = getAuthUser(c);
+    if (!user) {
+      return c.json({ error: "用户未认证" }, 401);
     }
 
     // 获取分页参数

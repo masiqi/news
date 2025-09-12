@@ -3,6 +3,15 @@
   "main": "src/index.ts",
   "compatibility_date": "2024-09-23",
   "compatibility_flags": ["nodejs_compat"],
+  "r2_buckets": [
+    {
+      "binding": "R2_BUCKET",
+      "bucket_name": "news-storage"
+    }
+  ],
+  "ai": {
+    "binding": "AI"
+  },
   "vars": {
     "JWT_SECRET": "development_jwt_secret_key_for_local_testing_only",
     "ADMIN_USERNAME": "admin",
@@ -11,35 +20,30 @@
   "assets": {
     "directory": "./public"
   },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "news-db",
+      "database_id": "local"
+    }
+  ],
   "queues": {
     "producers": [
       {
-        "queue": "RSS_PROCESSOR_QUEUE",
-        "max_batch_size": 10,
-        "max_wait_time_ms": 5000,
-        "max_retries": 3,
-        "dead_letter_queue": "RSS_PROCESSOR_DLQ"
+        "binding": "RSS_FETCHER_QUEUE",
+        "queue": "RSS_FETCHER_QUEUE"
       },
       {
-        "queue": "AI_PROCESSOR_QUEUE",
-        "max_batch_size": 5,
-        "max_wait_time_ms": 10000,
-        "max_retries": 3,
-        "dead_letter_queue": "AI_PROCESSOR_DLQ"
+        "binding": "AI_PROCESSOR_QUEUE",
+        "queue": "AI_PROCESSOR_QUEUE"
       }
     ],
     "consumers": [
       {
-        "queue": "RSS_PROCESSOR_QUEUE",
-        "script": "src/workers/rss-fetcher.ts",
-        "max_batch_size": 10,
-        "max_wait_time_ms": 5000
+        "queue": "RSS_FETCHER_QUEUE"
       },
       {
-        "queue": "AI_PROCESSOR_QUEUE",
-        "script": "src/workers/ai-processor.ts",
-        "max_batch_size": 5,
-        "max_wait_time_ms": 10000
+        "queue": "AI_PROCESSOR_QUEUE"
       }
     ]
   }

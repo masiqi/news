@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { adminAuthMiddleware, adminAuditMiddleware } from '../../middleware/admin-auth.middleware';
 import { SourceStateService } from '../../services/admin/source-state.service';
-import { db } from '../index';
+import { initDB } from '../../db/index';
 import { sources, sourceCategories, sourceTags, sourceValidationHistories, sourceCategoryRelations, sourceTagRelations } from '../../db/schema';
 import { eq, and, gte, lte, desc, sql, count } from 'drizzle-orm';
 
@@ -24,23 +24,23 @@ adminStatisticsRoutes.get('/overview', async (c) => {
     const recommendedStats = await sourceStateService.getRecommendedSourcesStatistics();
 
     // 获取所有源统计
-    const [totalSourcesResult] = await db
+    const [totalSourcesResult] = await initDB(c.env.DB)
       .select({ count: count() })
       .from(sources);
 
-    const [recommendedSourcesResult] = await db
+    const [recommendedSourcesResult] = await initDB(c.env.DB)
       .select({ count: count() })
       .from(sources)
       .where(eq(sources.isRecommended, true));
 
     // 获取分类统计
-    const [totalCategoriesResult] = await db
+    const [totalCategoriesResult] = await initDB(c.env.DB)
       .select({ count: count() })
       .from(sourceCategories)
       .where(eq(sourceCategories.isActive, true));
 
     // 获取标签统计
-    const [totalTagsResult] = await db
+    const [totalTagsResult] = await initDB(c.env.DB)
       .select({ count: count() })
       .from(sourceTags)
       .where(eq(sourceTags.isActive, true));

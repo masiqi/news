@@ -81,21 +81,45 @@ export async function authMiddleware(c: Context, next: Next): Promise<Response> 
  */
 export async function adminAuthMiddleware(c: Context, next: Next): Promise<Response> {
   try {
-    // 首先通过普通认证中间件
-    await authMiddleware(c, async () => {
-      const user = c.get('user') as AuthUser;
-      
-      if (!user.isAdmin) {
-        throw new Error('权限不足');
-      }
-      
-      await next();
-    });
-  } catch (error) {
-    if (error.message === '权限不足') {
+    // 获取Authorization头
+    const authHeader = c.req.header('Authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return c.json({ error: '未提供有效的认证令牌' }, 401);
+    }
+
+    const token = authHeader.substring(7); // 移除 "Bearer " 前缀
+
+    // 验证JWT令牌
+    const secret = c.env.JWT_SECRET;
+    if (!secret) {
+      console.error('JWT_SECRET环境变量未配置');
+      return c.json({ error: '服务器配置错误' }, 500);
+    }
+
+    const decoded = jwt.verify(token, secret) as any;
+    
+    // 验证是否为管理员
+    if (!decoded.isAdmin) {
       return c.json({ error: '需要管理员权限' }, 403);
     }
-    throw error;
+    
+    // 将管理员信息添加到上下文
+    c.set('user', {
+      id: decoded.id || 0,
+      username: decoded.username,
+      isAdmin: true,
+    } as AuthUser);
+
+    await next();
+  } catch (error) {
+    if (error instanceof jwt.JsonWebTokenError) {
+      return c.json({ error: '无效的认证令牌' }, 401);
+    }
+    if (error instanceof jwt.TokenExpiredError) {
+      return c.json({ error: '认证令牌已过期' }, 401);
+    }
+    console.error('管理员认证中间件错误:', error);
+    return c.json({ error: '服务器内部错误' }, 500);
   }
 }
 

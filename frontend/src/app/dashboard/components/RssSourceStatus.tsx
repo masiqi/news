@@ -44,16 +44,31 @@ export default function RssSourceStatus() {
 
   const handleTriggerFetch = async (sourceId: number) => {
     try {
-      // 这里应该调用API来手动触发特定RSS源的获取
-      // 为简化起见，我们暂时使用alert
-      alert(`手动触发源 ${sourceId} 的获取任务`);
+      console.log(`开始手动触发RSS源 ${sourceId} 获取`);
       
-      // 在实际实现中，我们应该调用API端点来触发获取
-      // 例如: await fetch(`/api/sources/${sourceId}/trigger`, { method: 'POST' });
+      const response = await fetch(`/api/sources/${sourceId}/trigger-fetch`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
       
-      // 刷新状态
-      await fetchSourceStatus();
+      const data = await response.json();
+      
+      if (response.ok) {
+        console.log(`成功触发RSS源 ${sourceId} 获取:`, data);
+        alert(`成功触发RSS源 ${sourceId} 的获取任务`);
+        
+        // 等待2秒后刷新状态，让获取任务有时间开始处理
+        setTimeout(async () => {
+          await fetchSourceStatus();
+        }, 2000);
+      } else {
+        console.error(`触发RSS源 ${sourceId} 获取失败:`, data);
+        alert(`触发获取失败: ${data.error || '未知错误'}`);
+      }
     } catch (err) {
+      console.error(`触发RSS源 ${sourceId} 获取时出错:`, err);
       alert('触发获取任务失败');
     }
   };

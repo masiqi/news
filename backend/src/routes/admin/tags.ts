@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { adminAuthMiddleware, adminAuditMiddleware, getCurrentUser } from '../../middleware/admin-auth.middleware';
-import { db } from '../index';
+import { initDB } from '../../db/index';
 import { sourceTags, sourceTagRelations } from '../../db/schema';
 import { eq, and, or, like, desc, asc, sql } from 'drizzle-orm';
 
@@ -30,7 +30,7 @@ adminTagsRoutes.get('/', async (c) => {
     }
 
     // 构建查询
-    let query = db.select().from(sourceTags);
+    let query = initDB(c.env.DB).select().from(sourceTags);
     
     if (whereConditions.length > 0) {
       query = query.where(and(...whereConditions));
@@ -59,7 +59,7 @@ adminTagsRoutes.get('/:id', async (c) => {
       return c.json({ error: '无效的标签ID' }, 400);
     }
 
-    const [tag] = await db
+    const [tag] = await initDB(c.env.DB)
       .select()
       .from(sourceTags)
       .where(eq(sourceTags.id, tagId));
@@ -69,7 +69,7 @@ adminTagsRoutes.get('/:id', async (c) => {
     }
 
     // 获取该标签下的源数量
-    const [sourceCount] = await db
+    const [sourceCount] = await initDB(c.env.DB)
       .select({ count: sql`count(*)` })
       .from(sourceTagRelations)
       .where(eq(sourceTagRelations.tagId, tagId));
@@ -101,7 +101,7 @@ adminTagsRoutes.post('/', async (c) => {
     }
 
     // 检查名称是否已存在
-    const [existingTag] = await db
+    const [existingTag] = await initDB(c.env.DB)
       .select()
       .from(sourceTags)
       .where(eq(sourceTags.name, name));
@@ -113,7 +113,7 @@ adminTagsRoutes.post('/', async (c) => {
     const now = new Date();
     
     // 创建标签
-    const [newTag] = await db
+    const [newTag] = await initDB(c.env.DB)
       .insert(sourceTags)
       .values({
         name,
@@ -161,7 +161,7 @@ adminTagsRoutes.put('/:id', async (c) => {
 
     // 如果要修改名称，检查是否已存在
     if (name && name !== existingTag.name) {
-      const [duplicateTag] = await db
+      const [duplicateTag] = await initDB(c.env.DB)
         .select()
         .from(sourceTags)
         .where(
@@ -186,7 +186,7 @@ adminTagsRoutes.put('/:id', async (c) => {
     };
 
     // 更新标签
-    const [updatedTag] = await db
+    const [updatedTag] = await initDB(c.env.DB)
       .update(sourceTags)
       .set(updateData)
       .where(eq(sourceTags.id, tagId))
@@ -209,7 +209,7 @@ adminTagsRoutes.delete('/:id', async (c) => {
     }
 
     // 检查标签是否存在
-    const [tag] = await db
+    const [tag] = await initDB(c.env.DB)
       .select()
       .from(sourceTags)
       .where(eq(sourceTags.id, tagId));
@@ -219,7 +219,7 @@ adminTagsRoutes.delete('/:id', async (c) => {
     }
 
     // 检查是否有关联的源
-    const [sourceCount] = await db
+    const [sourceCount] = await initDB(c.env.DB)
       .select({ count: sql`count(*)` })
       .from(sourceTagRelations)
       .where(eq(sourceTagRelations.tagId, tagId));
@@ -232,7 +232,7 @@ adminTagsRoutes.delete('/:id', async (c) => {
     }
 
     // 删除标签
-    await db.delete(sourceTags).where(eq(sourceTags.id, tagId));
+    await initDB(c.env.DB).delete(sourceTags).where(eq(sourceTags.id, tagId));
 
     return c.json({ success: true });
   } catch (error) {
@@ -256,7 +256,7 @@ adminTagsRoutes.patch('/:id/toggle', async (c) => {
     }
 
     // 检查标签是否存在
-    const [tag] = await db
+    const [tag] = await initDB(c.env.DB)
       .select()
       .from(sourceTags)
       .where(eq(sourceTags.id, tagId));
@@ -291,7 +291,7 @@ adminTagsRoutes.get('/popular/limit/:limit', async (c) => {
       return c.json({ error: '无效的limit参数，必须在1-100之间' }, 400);
     }
 
-    const popularTags = await db
+    const popularTags = await initDB(c.env.DB)
       .select()
       .from(sourceTags)
       .where(eq(sourceTags.isActive, true))
@@ -320,7 +320,7 @@ adminTagsRoutes.patch('/:id/update-usage', async (c) => {
     }
 
     // 检查标签是否存在
-    const [tag] = await db
+    const [tag] = await initDB(c.env.DB)
       .select()
       .from(sourceTags)
       .where(eq(sourceTags.id, tagId));
@@ -330,7 +330,7 @@ adminTagsRoutes.patch('/:id/update-usage', async (c) => {
     }
 
     // 更新使用量
-    const [updatedTag] = await db
+    const [updatedTag] = await initDB(c.env.DB)
       .update(sourceTags)
       .set({ 
         usageCount: sql`${sourceTags.usageCount} + ${increment}`,
@@ -364,7 +364,7 @@ adminTagsRoutes.patch('/batch-update-usage', async (c) => {
 
     // 批量更新使用量
     const updatePromises = tagUpdates.map(item =>
-      db
+      initDB(c.env.DB)
         .update(sourceTags)
         .set({ 
           usageCount: sql`${sourceTags.usageCount} + ${item.increment}`,
