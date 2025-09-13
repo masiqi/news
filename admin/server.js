@@ -32,10 +32,24 @@ const server = http.createServer((req, res) => {
   }
   
   // 处理API和Admin代理请求
-  if ((pathname.startsWith('/api/') || pathname.startsWith('/admin/') || pathname.startsWith('/sources/') || pathname.startsWith('/system/')) && (req.method === 'GET' || req.method === 'POST' || req.method === 'PUT' || req.method === 'DELETE' || req.method === 'PATCH')) {
-    // 构造后端API的路径 - 保持原有的路径结构
-    const backendPath = pathname;
-    console.log(`代理请求: ${req.method} ${pathname} -> ${backendUrl}${backendPath}`);
+  if ((pathname.startsWith('/api/') || pathname.startsWith('/admin/') || pathname.startsWith('/sources/') || pathname.startsWith('/system/') || pathname.startsWith('/llm-extractor/') || pathname.startsWith('/llm-content-extractor/') || pathname.startsWith('/topics/') || pathname.startsWith('/web-content/')) && (req.method === 'GET' || req.method === 'POST' || req.method === 'PUT' || req.method === 'DELETE' || req.method === 'PATCH')) {
+    // 构造后端API的路径 - 对于/api/前缀的请求，去掉/api前缀
+    let backendPath = pathname;
+    if (pathname.startsWith('/api/')) {
+      backendPath = pathname.substring(4); // 去掉'/api'前缀
+    }
+    
+    // 处理查询参数
+    const query = parsedUrl.query;
+    let queryString = '';
+    if (query && Object.keys(query).length > 0) {
+      queryString = '?' + Object.keys(query).map(key => `${encodeURIComponent(key)}=${encodeURIComponent(query[key])}`).join('&');
+    }
+    
+    // 构造完整的后端API路径（包含查询参数）
+    const fullBackendPath = backendPath + queryString;
+    
+    console.log(`代理请求: ${req.method} ${pathname}${queryString ? '?' + Object.keys(query).map(key => `${key}=${query[key]}`).join('&') : ''} -> ${backendUrl}${fullBackendPath}`);
     console.log(`请求headers:`, req.headers);
     
     // 构造转发请求的headers
@@ -57,7 +71,7 @@ const server = http.createServer((req, res) => {
     
     console.log(`最终转发的headers:`, proxyHeaders);
     
-    const backendReq = http.request(`${backendUrl}${backendPath}`, {
+    const backendReq = http.request(`${backendUrl}${fullBackendPath}`, {
       method: req.method,
       headers: proxyHeaders
     }, (backendRes) => {

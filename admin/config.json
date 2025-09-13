@@ -1,8 +1,8 @@
 {
   "development": {
-    "backendHost": "10.1.0.241",
-    "backendPort": 8787,
-    "adminPort": 8000
+    "backendHost": "localhost",
+    "backendPort": 35563,
+    "adminPort": 8101
   },
   "production": {
     "backendHost": "10.1.0.241",

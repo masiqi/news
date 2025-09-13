@@ -1,5 +1,8 @@
 // src/routes/llm-extractor.ts
 import { Hono } from "hono";
+import { drizzle } from 'drizzle-orm/d1';
+import { processedContents, rssEntries } from '../db/schema';
+import { eq, insert } from 'drizzle-orm';
 
 const llmExtractorRoutes = new Hono();
 
@@ -7,7 +10,7 @@ const llmExtractorRoutes = new Hono();
 llmExtractorRoutes.post("/extract", async (c) => {
   try {
     const body = await c.req.json();
-    const { url, title } = body;
+    const { url, title, entryId } = body;
     
     if (!url || !title) {
       return c.json({ error: "请提供URL和标题" }, 400);
@@ -37,6 +40,12 @@ llmExtractorRoutes.post("/extract", async (c) => {
     // 2. 使用LLM提取所有信息
     console.log('步骤2: 使用智谱GLM-4.5-Flash智能提取新闻信息...');
     const extractedContent = await extractContentWithLLM(htmlContent, title);
+    
+    // 3. 如果提供了entryId，保存到数据库
+    if (entryId) {
+      console.log('步骤3: 保存提取结果到数据库...');
+      await saveExtractedContentToDB(c.env.DB, entryId, extractedContent);
+    }
     
     const endTime = Date.now();
     const processingTime = endTime - startTime;
@@ -101,7 +110,7 @@ llmExtractorRoutes.post("/test-url", async (c) => {
 
 // 使用LLM从HTML中提取新闻内容（智谱AI版本）
 async function extractContentWithLLM(html: string, title: string) {
-  const extractionPrompt = `请从以下HTML网页中提取新闻信息：
+  const extractionPrompt = `请从以下HTML网页中提取新闻信息并进行智能分析：
 
 网页标题：${title}
 
@@ -115,9 +124,13 @@ ${html}
 4. 新闻发布时间（如果存在）
 5. 作者（如果存在）
 6. 新闻来源（如果存在）
-7. 3-5个主题标签
-8. 5-8个关键词
-9. 正文字数
+7. 图片URL列表（从HTML中提取）
+8. 相关链接列表（从HTML中提取）
+9. 3-5个主题标签
+10. 5-8个关键词
+11. 正文字数
+12. 新闻分析解读（包括事件背景、影响、意义等）
+13. 教育价值（对高中生的学习价值，如知识点、思维能力培养、社会认知等）
 
 返回格式：
 {
@@ -127,9 +140,13 @@ ${html}
   "publishTime": "发布时间",
   "author": "作者",
   "source": "来源",
+  "images": ["图片URL1", "图片URL2"],
+  "links": ["相关链接1", "相关链接2"],
   "topics": ["主题1", "主题2", "主题3"],
   "keywords": ["关键词1", "关键词2", "关键词3"],
-  "wordCount": 字数
+  "wordCount": 字数,
+  "analysis": "新闻分析解读内容",
+  "educationalValue": "教育价值说明"
 }`;
 
   console.log('调用智谱GLM-4.5-Flash进行内容提取...');
@@ -148,7 +165,8 @@ ${html}
     ],
     temperature: 0.6,
     max_tokens: 12000,
-    stream: false
+    stream: false,
+    response_format: { "type": "json_object" }
   };
 
   console.log('智谱AI请求:', JSON.stringify(chatCompletionRequest, null, 2));
@@ -184,10 +202,14 @@ ${html}
   console.log(`智谱AI响应内容长度: ${responseContent.length}`);
   
   try {
-    // 尝试解析JSON响应
-    const jsonMatch = responseContent.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      const parsed = JSON.parse(jsonMatch[0]);
+    console.log('智谱AI原始响应内容:');
+    console.log(responseContent);
+    
+    // 使用response_format: {"type": "json_object"}后，响应应该是纯JSON
+    try {
+      const parsed = JSON.parse(responseContent);
+      console.log('JSON解析成功:', parsed);
+      
       return {
         title: parsed.title || title,
         content: parsed.content || '',
@@ -195,24 +217,18 @@ ${html}
         publishTime: parsed.publishTime || '',
         author: parsed.author || '',
         source: parsed.source || '',
+        images: Array.isArray(parsed.images) ? parsed.images.slice(0, 10) : [],
+        links: Array.isArray(parsed.links) ? parsed.links.slice(0, 10) : [],
         topics: Array.isArray(parsed.topics) ? parsed.topics.slice(0, 5) : [],
         keywords: Array.isArray(parsed.keywords) ? parsed.keywords.slice(0, 10) : [],
-        wordCount: parsed.wordCount || 0
+        wordCount: parsed.wordCount || 0,
+        analysis: parsed.analysis || '',
+        educationalValue: parsed.educationalValue || ''
       };
-    } else {
-      console.log('未找到JSON格式响应');
-      // 如果JSON解析失败，返回默认内容
-      return {
-        title: title,
-        content: responseContent.substring(0, 2000),
-        summary: '',
-        publishTime: '',
-        author: '',
-        source: '',
-        topics: ["新闻主题"],
-        keywords: ["新闻", "事件"],
-        wordCount: responseContent.substring(0, 2000).length
-      };
+    } catch (parseError) {
+      console.error('JSON解析失败:', parseError);
+      console.log('尝试解析的响应内容:', responseContent);
+      throw parseError;
     }
   } catch (error) {
     console.error('解析智谱AI响应失败:', error);
@@ -224,11 +240,173 @@ ${html}
       publishTime: '',
       author: '',
       source: '',
+      images: [],
+      links: [],
       topics: ["新闻主题"],
       keywords: ["新闻", "事件"],
-      wordCount: responseContent.substring(0, 1500).length
+      wordCount: responseContent.substring(0, 1500).length,
+      analysis: '',
+      educationalValue: ''
     };
   }
 }
+
+// 保存提取的内容到数据库
+async function saveExtractedContentToDB(db: any, entryId: number, content: any): Promise<void> {
+  try {
+    const drizzleDb = drizzle(db);
+    const topicsJson = JSON.stringify(content.topics || []);
+    const keywordsString = content.keywords ? content.keywords.join(',') : '';
+    const imagesJson = JSON.stringify(content.images || []);
+    const linksJson = JSON.stringify(content.links || []);
+    
+    // 检查是否已存在 processed_content 记录
+    const existingRecord = await drizzleDb.select()
+      .from(processedContents)
+      .where(eq(processedContents.entryId, entryId))
+      .get();
+    
+    if (existingRecord) {
+      // 更新现有记录
+      await drizzleDb.update(processedContents)
+        .set({
+          markdownContent: content.content,
+          summary: content.summary || '',
+          topics: topicsJson,
+          keywords: keywordsString,
+          images: imagesJson,
+          links: linksJson,
+          author: content.author || '',
+          source: content.source || '',
+          publishTime: content.publishTime || '',
+          analysis: content.analysis || '',
+          educationalValue: content.educationalValue || '',
+          wordCount: content.wordCount || 0,
+          modelUsed: 'glm-4.5-flash',
+          processingTime: content.processingTime || 0
+        })
+        .where(eq(processedContents.entryId, entryId));
+      console.log(`更新现有processed_content记录，条目ID: ${entryId}`);
+    } else {
+      // 创建新记录
+      await drizzleDb.insert(processedContents)
+        .values({
+          entryId: entryId,
+          summary: content.summary || '',
+          markdownContent: content.content,
+          topics: topicsJson,
+          keywords: keywordsString,
+          images: imagesJson,
+          links: linksJson,
+          author: content.author || '',
+          source: content.source || '',
+          publishTime: content.publishTime || '',
+          analysis: content.analysis || '',
+          educationalValue: content.educationalValue || '',
+          wordCount: content.wordCount || 0,
+          modelUsed: 'glm-4.5-flash',
+          processingTime: content.processingTime || 0,
+          createdAt: new Date()
+        });
+      console.log(`创建新processed_content记录，条目ID: ${entryId}`);
+    }
+    
+    // 更新 rss_entries 表的处理状态
+    await drizzleDb.update(rssEntries)
+      .set({
+        processed: true,
+        processedAt: new Date(),
+        failureCount: 0,
+        errorMessage: null
+      })
+      .where(eq(rssEntries.id, entryId));
+    
+    console.log(`LLM提取内容已保存到数据库，条目ID: ${entryId}，主题: ${content.topics?.join(', ') || '无'}，状态已更新为已处理`);
+  } catch (error) {
+    console.error('保存LLM提取内容到数据库失败:', error);
+    throw error;
+  }
+}
+
+// 为已有条目进行AI内容提取（带状态更新）
+llmExtractorRoutes.post("/extract-entry/:entryId", async (c) => {
+  try {
+    const entryId = parseInt(c.req.param('entryId'));
+    
+    if (isNaN(entryId)) {
+      return c.json({ error: "无效的条目ID" }, 400);
+    }
+
+    const body = await c.req.json();
+    const { url, title } = body;
+    
+    if (!url || !title) {
+      return c.json({ error: "请提供URL和标题" }, 400);
+    }
+
+    console.log(`开始为条目 ${entryId} 进行AI内容提取: ${url}`);
+    const startTime = Date.now();
+    
+    // 1. 抓取网页HTML
+    console.log('步骤1: 抓取网页HTML...');
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+        'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+      },
+      timeout: 30000,
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+    
+    const htmlContent = await response.text();
+    console.log(`网页抓取完成，内容长度: ${htmlContent.length}`);
+    
+    // 2. 使用LLM提取所有信息
+    console.log('步骤2: 使用智谱GLM-4.5-Flash智能提取新闻信息...');
+    const extractedContent = await extractContentWithLLM(htmlContent, title);
+    
+    // 3. 保存到数据库并更新状态
+    console.log('步骤3: 保存提取结果到数据库...');
+    extractedContent.processingTime = Date.now() - startTime;
+    await saveExtractedContentToDB(c.env.DB, entryId, extractedContent);
+    
+    const endTime = Date.now();
+    const processingTime = endTime - startTime;
+    console.log(`条目 ${entryId} AI内容提取完成，总耗时: ${processingTime}ms`);
+    
+    return c.json({
+      success: true,
+      message: `条目 ${entryId} AI内容提取成功`,
+      data: {
+        entryId,
+        url,
+        title: extractedContent.title,
+        content: extractedContent.content,
+        contentPreview: extractedContent.content.substring(0, 300) + (extractedContent.content.length > 300 ? '...' : ''),
+        summary: extractedContent.summary,
+        topics: extractedContent.topics,
+        keywords: extractedContent.keywords,
+        publishTime: extractedContent.publishTime,
+        author: extractedContent.author,
+        source: extractedContent.source,
+        wordCount: extractedContent.wordCount,
+        processingTime,
+        modelUsed: "glm-4.5-flash",
+        processed: true
+      }
+    });
+    
+  } catch (error) {
+    console.error('条目AI内容提取失败:', error);
+    return c.json({ 
+      error: "条目AI内容提取失败", 
+      details: error instanceof Error ? error.message : '未知错误'
+    }, 500);
+  }
+});
 
 export default llmExtractorRoutes;

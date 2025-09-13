@@ -22,6 +22,45 @@
             height: 100vh;
             background-color: #f5f5f5;
         }
+        
+        /* 强制显示分页控件 */
+        .cxd-Pagination {
+            display: block !important;
+            visibility: visible !important;
+            position: relative !important;
+            z-index: 9999 !important;
+        }
+        
+        .cxd-Crud-pager {
+            display: block !important;
+            visibility: visible !important;
+            position: relative !important;
+            z-index: 9999 !important;
+        }
+        
+        /* 强制显示分页控件容器 */
+        .cxd-Crud-footerToolbar {
+            display: block !important;
+            visibility: visible !important;
+        }
+        
+        /* 确保分页控件横向排列 */
+        .cxd-Pagination {
+            display: flex !important;
+            flex-direction: row !important;
+            align-items: center !important;
+        }
+        
+        .cxd-Pagination-wrap {
+            display: flex !important;
+            align-items: center !important;
+        }
+        
+        .cxd-Pagination ul {
+            display: flex !important;
+            flex-direction: row !important;
+            align-items: center !important;
+        }
     </style>
 </head>
 <body>
@@ -553,6 +592,23 @@
                                 url: '/admin/users',
                                 headers: {
                                     'Authorization': 'Bearer ' + localStorage.getItem('admin_token')
+                                },
+                                adaptor: function(payload, response) {
+                                    console.log('用户管理API原始响应:', response);
+                                    // 处理嵌套的API响应格式 {success: true, data: {users: [], pagination: {}}}
+                                    const data = response.data?.data || response.data || response;
+                                    console.log('用户管理处理后的数据:', data);
+                                    // 转换API响应格式以适配amis CRUD
+                                    return {
+                                        status: 0,
+                                        msg: '',
+                                        data: {
+                                            items: data.users || [],
+                                            total: data.pagination?.total || 0,
+                                            page: data.pagination?.page || 1,
+                                            perPage: data.pagination?.limit || 20
+                                        }
+                                    };
                                 }
                             },
                             defaultParams: {
@@ -740,6 +796,19 @@
                                                                         url: '/admin/roles/users/${id}/roles',
                                                                         headers: {
                                                                             'Authorization': 'Bearer ' + localStorage.getItem('admin_token')
+                                                                        },
+                                                                        adaptor: function(payload, response) {
+                                                                            const data = response.data || response;
+                                                                            return {
+                                                                                status: 0,
+                                                                                msg: '',
+                                                                                data: {
+                                                                                    items: data.roles || [],
+                                                                                    total: data.pagination?.total || 0,
+                                                                                    page: data.pagination?.page || 1,
+                                                                                    perPage: data.pagination?.limit || 10
+                                                                                }
+                                                                            };
                                                                         }
                                                                     },
                                                                     body: {
@@ -772,6 +841,19 @@
                                                                         url: '/admin/users/${id}/logs',
                                                                         headers: {
                                                                             'Authorization': 'Bearer ' + localStorage.getItem('admin_token')
+                                                                        },
+                                                                        adaptor: function(payload, response) {
+                                                                            const data = response.data || response;
+                                                                            return {
+                                                                                status: 0,
+                                                                                msg: '',
+                                                                                data: {
+                                                                                    items: data.logs || [],
+                                                                                    total: data.pagination?.total || 0,
+                                                                                    page: data.pagination?.page || 1,
+                                                                                    perPage: data.pagination?.limit || 20
+                                                                                }
+                                                                            };
                                                                         }
                                                                     },
                                                                     body: {
@@ -930,6 +1012,19 @@
                                                         url: '/admin/users/${id}/sessions',
                                                         headers: {
                                                             'Authorization': 'Bearer ' + localStorage.getItem('admin_token')
+                                                        },
+                                                        adaptor: function(payload, response) {
+                                                            const data = response.data || response;
+                                                            return {
+                                                                status: 0,
+                                                                msg: '',
+                                                                data: {
+                                                                    items: data.sessions || [],
+                                                                    total: data.pagination?.total || 0,
+                                                                    page: data.pagination?.page || 1,
+                                                                    perPage: data.pagination?.limit || 20
+                                                                }
+                                                            };
                                                         }
                                                     },
                                                     body: {
@@ -1068,17 +1163,11 @@
                                         }
                                     }
                                 },
-                                {
-                                    type: 'pagination',
-                                    align: 'right'
-                                }
+                                'pagination'
                             ],
                             footerToolbar: [
                                 'statistics',
-                                {
-                                    type: 'pagination',
-                                    align: 'right'
-                                }
+                                'pagination'
                             ]
                         }
                     ]
@@ -1098,6 +1187,23 @@
                         url: '/admin/sources',
                         headers: {
                             'Authorization': 'Bearer ' + localStorage.getItem('admin_token')
+                        },
+                        adaptor: function(payload, response) {
+                            console.log('RSS源管理API原始响应:', response);
+                            // 处理嵌套的API响应格式 {success: true, data: {sources: [], pagination: {}}}
+                            const data = response.data?.data || response.data || response;
+                            console.log('RSS源管理处理后的数据:', data);
+                            // 转换API响应格式以适配amis CRUD
+                            return {
+                                status: 0,
+                                msg: '',
+                                data: {
+                                    items: data.sources || [],
+                                    total: data.pagination?.total || 0,
+                                    page: data.pagination?.page || 1,
+                                    perPage: data.pagination?.limit || 10
+                                }
+                            };
                         }
                     },
                     defaultParams: {
@@ -1334,6 +1440,19 @@
                                                 url: '/api/sources/${id}/entries',
                                                 headers: {
                                                     'Authorization': 'Bearer ' + localStorage.getItem('admin_token')
+                                                },
+                                                adaptor: function(payload, response) {
+                                                    const data = response.data || response;
+                                                    return {
+                                                        status: 0,
+                                                        msg: '',
+                                                        data: {
+                                                            items: data.entries || [],
+                                                            total: data.pagination?.total || 0,
+                                                            page: data.pagination?.page || 1,
+                                                            perPage: data.pagination?.perPage || 10
+                                                        }
+                                                    };
                                                 }
                                             },
                                             defaultParams: {
@@ -1559,10 +1678,7 @@
                     ],
                     footerToolbar: [
                         'statistics',
-                        {
-                            type: 'pagination',
-                            align: 'right'
-                        }
+                        'pagination'
                     ]
                 }
             };
@@ -1613,6 +1729,111 @@
                                     }
                                 }
                             ]
+                        },
+                        {
+                            type: 'divider'
+                        },
+                        {
+                            type: 'grid',
+                            columns: [
+                                {
+                                    type: 'panel',
+                                    title: '内容处理统计',
+                                    body: {
+                                        type: 'service',
+                                        api: {
+                                            method: 'get',
+                                            url: '/web-content/stats',
+                                            headers: {
+                                                'Authorization': 'Bearer ' + localStorage.getItem('admin_token')
+                                            }
+                                        },
+                                        body: {
+                                            type: 'grid',
+                                            columns: [
+                                                {
+                                                    type: 'tpl',
+                                                    tpl: '<h4>${processedCount || 0}</h4><p>已处理</p>'
+                                                },
+                                                {
+                                                    type: 'tpl',
+                                                    tpl: '<h4>${pendingCount || 0}</h4><p>待处理</p>'
+                                                },
+                                                {
+                                                    type: 'tpl',
+                                                    tpl: '<h4>${failedCount || 0}</h4><p>处理失败</p>'
+                                                }
+                                            ]
+                                        }
+                                    }
+                                },
+                                {
+                                    type: 'panel',
+                                    title: '主题统计',
+                                    body: {
+                                        type: 'service',
+                                        api: {
+                                            method: 'get',
+                                            url: '/topics/stats',
+                                            headers: {
+                                                'Authorization': 'Bearer ' + localStorage.getItem('admin_token')
+                                            }
+                                        },
+                                        body: {
+                                            type: 'grid',
+                                            columns: [
+                                                {
+                                                    type: 'tpl',
+                                                    tpl: '<h4>${extractedCount || 0}</h4><p>已提取主题</p>'
+                                                },
+                                                {
+                                                    type: 'tpl',
+                                                    tpl: '<h4>${uniqueTopics || 0}</h4><p>唯一主题数</p>'
+                                                },
+                                                {
+                                                    type: 'tpl',
+                                                    tpl: '<h4>${avgTopicsPerEntry || 0}</h4><p>平均主题数</p>'
+                                                }
+                                            ]
+                                        }
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            type: 'divider'
+                        },
+                        {
+                            type: 'panel',
+                            title: '热门主题',
+                            body: {
+                                type: 'service',
+                                api: {
+                                    method: 'get',
+                                    url: '/topics/popular',
+                                    headers: {
+                                        'Authorization': 'Bearer ' + localStorage.getItem('admin_token')
+                                    }
+                                },
+                                body: {
+                                    type: 'table',
+                                    columns: [
+                                        {
+                                            name: 'topic',
+                                            label: '主题'
+                                        },
+                                        {
+                                            name: 'count',
+                                            label: '出现次数'
+                                        },
+                                        {
+                                            name: 'percentage',
+                                            label: '占比',
+                                            tpl: '${percentage}%'
+                                        }
+                                    ]
+                                }
+                            }
                         }
                     ]
                 }
@@ -1631,17 +1852,35 @@
                         url: '/sources/entries/all',
                         headers: {
                             'Authorization': 'Bearer ' + localStorage.getItem('admin_token')
+                        },
+                        adaptor: function(payload, response) {
+                            const data = response.data || response;
+                            console.log('内容管理API原始响应:', data);
+                            // 转换API响应格式以适配amis CRUD
+                            const result = {
+                                status: 0,
+                                msg: '',
+                                data: {
+                                    items: data.entries || [],
+                                    total: data.pagination?.total || 0,
+                                    page: data.pagination?.page || 1,
+                                    perPage: data.pagination?.limit || data.pagination?.perPage || 10
+                                }
+                            };
+                            console.log('内容管理转换后响应:', result);
+                            return result;
                         }
                     },
                     defaultParams: {
-                        perPage: 20
+                        page: 1,
+                        perPage: 10
                     },
                     pageField: 'page',
                     perPageField: 'perPage',
                     interval: 0, // 禁用轮询
                     silentPolling: false,
                     stopAutoRefreshWhen: 'true',
-                    syncLocation: true, // 启用URL同步以支持分页
+                    syncLocation: false, // 禁用URL同步避免与hash路由冲突
                     columns: [
                         {
                             name: 'id',
@@ -1658,13 +1897,14 @@
                         {
                             name: 'title',
                             label: '标题',
-                            type: 'text'
+                            type: 'text',
+                            width: 300
                         },
                         {
                             name: 'content',
                             label: '内容预览',
                             type: 'text',
-                            width: 200
+                            width: 400
                         },
                         {
                             name: 'publishedAt',
@@ -1767,6 +2007,100 @@
                                                     }
                                                 },
                                                 {
+                                                    title: 'AI处理结果',
+                                                    body: {
+                                                        type: 'service',
+                                                        api: {
+                                                            method: 'get',
+                                                            url: '/web-content/${id}',
+                                                            headers: {
+                                                                'Authorization': 'Bearer ' + localStorage.getItem('admin_token')
+                                                            }
+                                                        },
+                                                        body: {
+                                                            type: 'form',
+                                                            mode: 'normal',
+                                                            body: [
+                                                                {
+                                                                    type: 'static',
+                                                                    name: 'title',
+                                                                    label: '提取标题'
+                                                                },
+                                                                {
+                                                                    type: 'static',
+                                                                    name: 'summary',
+                                                                    label: '内容摘要',
+                                                                    visibleOn: '${summary}'
+                                                                },
+                                                                {
+                                                                    type: 'static',
+                                                                    name: 'keywords',
+                                                                    label: '关键词',
+                                                                    visibleOn: '${keywords}'
+                                                                },
+                                                                {
+                                                                    type: 'static',
+                                                                    name: 'topics',
+                                                                    label: '主题',
+                                                                    visibleOn: '${topics}'
+                                                                },
+                                                                {
+                                                                    type: 'static',
+                                                                    name: 'content',
+                                                                    label: '提取内容',
+                                                                    visibleOn: '${content}',
+                                                                    tpl: '<div style="max-height: 400px; overflow-y: auto; white-space: pre-wrap; border: 1px solid #ddd; padding: 10px; background-color: #f9f9f9;">${content|raw}</div>'
+                                                                },
+                                                                {
+                                                                    type: 'static',
+                                                                    name: 'author',
+                                                                    label: '作者',
+                                                                    visibleOn: '${author}'
+                                                                },
+                                                                {
+                                                                    type: 'static',
+                                                                    name: 'source',
+                                                                    label: '来源',
+                                                                    visibleOn: '${source}'
+                                                                },
+                                                                {
+                                                                    type: 'static',
+                                                                    name: 'wordCount',
+                                                                    label: '字数',
+                                                                    visibleOn: '${wordCount}'
+                                                                },
+                                                                {
+                                                                    type: 'static',
+                                                                    name: 'processingTime',
+                                                                    label: '处理耗时',
+                                                                    visibleOn: '${processingTime}',
+                                                                    tpl: '${processingTime}ms'
+                                                                },
+                                                                {
+                                                                    type: 'static',
+                                                                    name: 'modelUsed',
+                                                                    label: '使用模型',
+                                                                    visibleOn: '${modelUsed}'
+                                                                },
+                                                                {
+                                                                    type: 'static',
+                                                                    name: 'analysis',
+                                                                    label: '分析解读',
+                                                                    visibleOn: '${analysis}',
+                                                                    tpl: '<div style="max-height: 300px; overflow-y: auto; white-space: pre-wrap; border: 1px solid #ddd; padding: 10px; background-color: #f9f9f9; line-height: 1.6;">${analysis|raw}</div>'
+                                                                },
+                                                                {
+                                                                    type: 'static',
+                                                                    name: 'educationalValue',
+                                                                    label: '教育价值',
+                                                                    visibleOn: '${educationalValue}',
+                                                                    tpl: '<div style="max-height: 300px; overflow-y: auto; white-space: pre-wrap; border: 1px solid #ddd; padding: 10px; background-color: #f9f9f9; line-height: 1.6;">${educationalValue|raw}</div>'
+                                                                }
+                                                            ]
+                                                        }
+                                                    }
+                                                },
+                                                {
                                                     title: '原始内容',
                                                     body: {
                                                         type: 'form',
@@ -1780,6 +2114,54 @@
                                                             }
                                                         ]
                                                     }
+                                                }
+                                            ]
+                                        }
+                                    }
+                                },
+                                {
+                                    type: 'button',
+                                    label: 'AI处理',
+                                    level: 'primary',
+                                    size: 'xs',
+                                    icon: 'fa fa-magic',
+                                    actionType: 'dialog',
+                                    dialog: {
+                                        title: 'AI内容处理 - ${title}',
+                                        size: 'lg',
+                                        body: {
+                                            type: 'form',
+                                            api: {
+                                                method: 'post',
+                                                url: '/llm-extractor/extract',
+                                                headers: {
+                                                    'Authorization': 'Bearer ' + localStorage.getItem('admin_token')
+                                                }
+                                            },
+                                            body: [
+                                                {
+                                                    type: 'hidden',
+                                                    name: 'url',
+                                                    value: '${link}'
+                                                },
+                                                {
+                                                    type: 'hidden',
+                                                    name: 'title',
+                                                    value: '${title}'
+                                                },
+                                                {
+                                                    type: 'static',
+                                                    label: '标题',
+                                                    tpl: '${title}'
+                                                },
+                                                {
+                                                    type: 'static',
+                                                    label: '链接',
+                                                    tpl: '<a href="${link}" target="_blank">${link}</a>'
+                                                },
+                                                {
+                                                    type: 'tpl',
+                                                    tpl: '<div class="alert alert-info">点击"开始处理"按钮，AI将自动提取网页内容、生成摘要、提取关键词和主题。</div>'
                                                 }
                                             ]
                                         }
@@ -1808,17 +2190,58 @@
                             align: 'left'
                         },
                         {
-                            type: 'pagination',
-                            align: 'right'
-                        }
+                            type: 'button',
+                            label: '批量AI处理',
+                            level: 'primary',
+                            icon: 'fa fa-magic',
+                            actionType: 'dialog',
+                            dialog: {
+                                title: '批量AI内容处理',
+                                size: 'lg',
+                                body: {
+                                    type: 'form',
+                                    api: {
+                                        method: 'post',
+                                        url: '/web-content/batch-fetch',
+                                        headers: {
+                                            'Authorization': 'Bearer ' + localStorage.getItem('admin_token')
+                                        },
+                                        data: {
+                                            entryIds: '${selectedItems|map:item=>item.id|join:,}'
+                                        }
+                                    },
+                                    body: [
+                                        {
+                                            type: 'tpl',
+                                            tpl: '<div class="alert alert-info">已选择 <strong>${selectedItems|length}</strong> 条记录进行AI处理</div>'
+                                        },
+                                        {
+                                            type: 'tpl',
+                                            tpl: '<div class="alert alert-warning">AI处理将提取网页内容、生成摘要、提取关键词和主题。批量处理可能需要一些时间，请耐心等待。</div>'
+                                        },
+                                        {
+                                            type: 'hidden',
+                                            name: 'entryIds',
+                                            value: '${selectedItems|map:item=>item.id|join:,}'
+                                        }
+                                    ]
+                                }
+                            },
+                            visibleOn: 'selectedItems && selectedItems.length > 0'
+                        },
+                        'pagination'
                     ],
                     footerToolbar: [
                         'statistics',
-                        {
-                            type: 'pagination',
-                            align: 'right'
-                        }
-                    ]
+                        'pagination'
+                    ],
+                    pagination: {
+                        page: 1,
+                        perPage: 10,
+                        mode: 'normal',
+                        layout: ['total', 'perPage', 'go', 'pager'],
+                        perPageAvailable: [10, 20, 50, 100]
+                    }
                 }
             };
         }

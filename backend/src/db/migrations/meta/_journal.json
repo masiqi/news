@@ -15,6 +15,13 @@
       "when": 1757393363549,
       "tag": "0001_slippery_christian_walker",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1757781770943,
+      "tag": "0002_fearless_sprite",
+      "breakpoints": true
     }
   ]
 }
