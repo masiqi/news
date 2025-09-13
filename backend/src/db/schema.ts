@@ -114,15 +114,28 @@ export const processedContents = sqliteTable('processed_contents', {
   summary: text('summary').notNull(), // AI生成的摘要
   markdownContent: text('markdown_content').notNull(), // AI处理后的Markdown内容
   keywords: text('keywords'), // 关键词（逗号分隔）
+  topics: text('topics'), // 主题标签（JSON格式存储）
+  images: text('images'), // 图片URL数组（JSON格式存储）
+  links: text('links'), // 相关链接数组（JSON格式存储）
+  author: text('author'), // 作者信息
+  source: text('source'), // 新闻来源
+  publishTime: text('publish_time'), // 发布时间
   sentiment: text('sentiment'), // 情感分析结果
+  analysis: text('analysis'), // 新闻分析解读
+  educationalValue: text('educational_value'), // 教育价值（针对高中生）
   processingTime: integer('processing_time'), // 处理耗时（毫秒）
   modelUsed: text('model_used'), // 使用的AI模型
+  wordCount: integer('word_count'), // 正文字数
   createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
 }, (table) => ({
   // 索引定义
   entryIdIdx: index('idx_processed_contents_entry_id').on(table.entryId),
   createdAtIdx: index('idx_processed_contents_created_at').on(table.createdAt),
   keywordsIdx: index('idx_processed_contents_keywords').on(table.keywords),
+  topicsIdx: index('idx_processed_contents_topics').on(table.topics),
+  sourceIdx: index('idx_processed_contents_source').on(table.source),
+  authorIdx: index('idx_processed_contents_author').on(table.author),
+  modelUsedIdx: index('idx_processed_contents_model_used').on(table.modelUsed),
 }));
 
 // 用户笔记表 - 存储用户个性化内容

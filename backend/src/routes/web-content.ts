@@ -2,7 +2,7 @@
 import { Hono } from "hono";
 import { WebContentService, ParsedNewsContent } from "../services/web-content.service";
 import { drizzle } from 'drizzle-orm/d1';
-import { rssEntries } from '../db/schema';
+import { rssEntries, processedContents } from '../db/schema';
 import { eq } from 'drizzle-orm';
 
 const webContentRoutes = new Hono<{ Bindings: CloudflareBindings }>();
@@ -176,14 +176,20 @@ webContentRoutes.get("/:entryId", async (c) => {
     return c.json({ error: "无效的条目ID" }, 400);
   }
 
+  console.log(`路由层: 开始处理条目 ${entryId} 的请求`);
+  
   const webContentService = new WebContentService(c.env.DB);
   
   try {
+    console.log(`路由层: 调用 WebContentService.getWebContent(${entryId})`);
     const webContent = await webContentService.getWebContent(entryId);
     
     if (!webContent) {
+      console.log(`路由层: WebContentService 返回 null，条目 ${entryId} 的网页内容不存在`);
       return c.json({ error: "网页内容不存在" }, 404);
     }
+    
+    console.log(`路由层: 成功获取条目 ${entryId} 的网页内容，长度: ${webContent.content.length}`);
     
     return c.json({
       success: true,
@@ -193,9 +199,63 @@ webContentRoutes.get("/:entryId", async (c) => {
       }
     });
   } catch (error) {
-    console.error('获取网页内容失败:', error);
+    console.error('路由层: 获取网页内容失败:', error);
     return c.json({ 
       error: "获取网页内容失败", 
+      details: error instanceof Error ? error.message : '未知错误'
+    }, 500);
+  }
+});
+
+// 检查条目和内容状态
+webContentRoutes.get("/check-entry/:entryId", async (c) => {
+  const entryId = parseInt(c.req.param('entryId'));
+  
+  if (isNaN(entryId)) {
+    return c.json({ error: "无效的条目ID" }, 400);
+  }
+
+  const db = drizzle(c.env.DB);
+  
+  try {
+    // 检查RSS条目是否存在
+    const rssEntry = await db.select()
+      .from(rssEntries)
+      .where(eq(rssEntries.id, entryId))
+      .get();
+    
+    // 检查processed content是否存在
+    const processedContent = await db.select()
+      .from(processedContents)
+      .where(eq(processedContents.entryId, entryId))
+      .get();
+    
+    return c.json({
+      success: true,
+      data: {
+        entryId,
+        rssEntry: rssEntry ? {
+          id: rssEntry.id,
+          title: rssEntry.title,
+          link: rssEntry.link,
+          processed: rssEntry.processed,
+          processedAt: rssEntry.processedAt
+        } : null,
+        processedContent: processedContent ? {
+          id: processedContent.id,
+          hasContent: !!processedContent.markdownContent,
+          contentLength: processedContent.markdownContent?.length || 0,
+          wordCount: processedContent.wordCount,
+          topics: processedContent.topics,
+          keywords: processedContent.keywords,
+          createdAt: processedContent.createdAt
+        } : null
+      }
+    });
+  } catch (error) {
+    console.error('检查条目状态失败:', error);
+    return c.json({ 
+      error: "检查条目状态失败", 
       details: error instanceof Error ? error.message : '未知错误'
     }, 500);
   }
@@ -238,6 +298,86 @@ webContentRoutes.get("/stats", async (c) => {
     console.error('获取网页内容统计失败:', error);
     return c.json({ 
       error: "获取网页内容统计失败", 
+      details: error instanceof Error ? error.message : '未知错误'
+    }, 500);
+  }
+});
+
+// 测试 WebContentService
+webContentRoutes.get("/test-service/:entryId", async (c) => {
+  const entryId = parseInt(c.req.param('entryId'));
+  
+  if (isNaN(entryId)) {
+    return c.json({ error: "无效的条目ID" }, 400);
+  }
+
+  const webContentService = new WebContentService(c.env.DB);
+  
+  try {
+    const webContent = await webContentService.getWebContent(entryId);
+    
+    return c.json({
+      success: true,
+      data: {
+        entryId,
+        webContent: webContent,
+        webContentExists: !!webContent,
+        serviceReturned: webContent !== null,
+        contentLength: webContent?.content?.length || 0
+      }
+    });
+  } catch (error) {
+    console.error('测试 WebContentService 失败:', error);
+    return c.json({ 
+      error: "测试 WebContentService 失败", 
+      details: error instanceof Error ? error.message : '未知错误'
+    }, 500);
+  }
+});
+
+// 直接测试数据库查询
+webContentRoutes.get("/test-db-query/:entryId", async (c) => {
+  const entryId = parseInt(c.req.param('entryId'));
+  
+  if (isNaN(entryId)) {
+    return c.json({ error: "无效的条目ID" }, 400);
+  }
+
+  const db = drizzle(c.env.DB);
+  
+  try {
+    console.log(`直接测试数据库查询，条目ID: ${entryId}`);
+    
+    // 测试1: 查询 processed_contents 表
+    const processedResult = await db.select()
+      .from(processedContents)
+      .where(eq(processedContents.entryId, entryId))
+      .get();
+    
+    console.log(`processed_contents 查询结果:`, processedResult);
+    
+    // 测试2: 查询 rss_entries 表  
+    const rssResult = await db.select()
+      .from(rssEntries)
+      .where(eq(rssEntries.id, entryId))
+      .get();
+      
+    console.log(`rss_entries 查询结果:`, rssResult);
+    
+    return c.json({
+      success: true,
+      data: {
+        entryId,
+        processedContent: processedResult,
+        rssEntry: rssResult,
+        processedContentExists: !!processedResult,
+        hasContent: processedResult?.markdownContent?.length > 0
+      }
+    });
+  } catch (error) {
+    console.error('数据库查询测试失败:', error);
+    return c.json({ 
+      error: "数据库查询测试失败", 
       details: error instanceof Error ? error.message : '未知错误'
     }, 500);
   }

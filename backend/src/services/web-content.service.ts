@@ -11,6 +11,15 @@ export interface WebContentResult {
   links: string[]; // 相关链接
   publishDate?: Date;
   wordCount: number;
+  url?: string; // 原始链接
+  // AI处理的额外字段
+  summary?: string;
+  topics?: string[];
+  keywords?: string[];
+  author?: string;
+  source?: string;
+  analysis?: string;
+  educationalValue?: string;
 }
 
 export interface ParsedNewsContent {
@@ -106,6 +115,8 @@ export class WebContentService {
     return {
       title,
       content,
+      topics: [], // WebContentService不提取主题，留空由AI处理
+      keywords: [], // WebContentService不提取关键词，留空由AI处理
       images,
       links,
       wordCount
@@ -336,14 +347,31 @@ export class WebContentService {
    */
   private async saveWebContent(entryId: number, content: ParsedNewsContent): Promise<void> {
     try {
-      await this.db.update(processedContents)
+      const drizzleDb = drizzle(this.db);
+      const topicsJson = JSON.stringify(content.topics || []);
+      const keywordsString = content.keywords ? content.keywords.join(',') : '';
+      
+      // 更新 processed_contents 表
+      await drizzleDb.update(processedContents)
         .set({
           markdownContent: content.content,
-          wordCount: content.wordCount
+          wordCount: content.wordCount,
+          topics: topicsJson,
+          keywords: keywordsString
         })
         .where(eq(processedContents.entryId, entryId));
       
-      console.log(`网页内容已保存，条目ID: ${entryId}，字数: ${content.wordCount}`);
+      // 更新 rss_entries 表的处理状态
+      await drizzleDb.update(rssEntries)
+        .set({
+          processed: true,
+          processedAt: new Date(),
+          failureCount: 0,
+          errorMessage: null
+        })
+        .where(eq(rssEntries.id, entryId));
+      
+      console.log(`网页内容已保存，条目ID: ${entryId}，字数: ${content.wordCount}，主题: ${content.topics?.join(', ') || '无'}，状态已更新为已处理`);
     } catch (error) {
       console.error('保存网页内容失败:', error);
       throw error;
@@ -355,30 +383,148 @@ export class WebContentService {
    */
   async getWebContent(entryId: number): Promise<WebContentResult | null> {
     try {
-      const result = await this.db.select({
-          content: processedContents.markdownContent,
-          createdAt: processedContents.createdAt
+      const drizzleDb = drizzle(this.db);
+      
+      console.log(`WebContentService: 开始查询条目 ${entryId} 的内容`);
+      
+      // 首先获取 rssEntries 表中的基本信息
+      const rssEntry = await drizzleDb.select({
+          title: rssEntries.title,
+          link: rssEntries.link,
+          publishedAt: rssEntries.publishedAt
         })
         .from(rssEntries)
-        .innerJoin(processedContents, eq(rssEntries.id, processedContents.entryId))
         .where(eq(rssEntries.id, entryId))
         .get();
       
-      if (!result || !result.content) {
+      if (!rssEntry) {
+        console.log(`WebContentService: 条目 ${entryId} 在 rss_entries 表中不存在`);
         return null;
       }
       
+      // 检查 processed_contents 表中是否有AI处理的内容
+      const processedResult = await drizzleDb.select({
+          content: processedContents.markdownContent,
+          summary: processedContents.summary,
+          keywords: processedContents.keywords,
+          topics: processedContents.topics,
+          images: processedContents.images,
+          links: processedContents.links,
+          author: processedContents.author,
+          source: processedContents.source,
+          publishTime: processedContents.publishTime,
+          analysis: processedContents.analysis,
+          educationalValue: processedContents.educationalValue,
+          wordCount: processedContents.wordCount,
+          createdAt: processedContents.createdAt
+        })
+        .from(processedContents)
+        .where(eq(processedContents.entryId, entryId))
+        .get();
+      
+      console.log(`WebContentService: RSS条目信息:`, rssEntry);
+      console.log(`WebContentService: 处理内容结果:`, processedResult);
+      
+      if (!processedResult) {
+        console.log(`WebContentService: 条目 ${entryId} 没有找到处理后的内容记录`);
+        return null;
+      }
+      
+      if (!processedResult.content) {
+        console.log(`WebContentService: 条目 ${entryId} 找到记录但内容为空`);
+        return null;
+      }
+      
+      console.log(`WebContentService: 找到条目 ${entryId} 的完整内容，长度: ${processedResult.content.length}`);
+      
+      // 解析JSON字段（兼容字符串和JSON格式）
+      let parsedImages = [];
+      let parsedLinks = [];
+      let parsedTopics = [];
+      
+      try {
+        if (processedResult.images) {
+          if (processedResult.images.startsWith('[') || processedResult.images.startsWith('{')) {
+            parsedImages = JSON.parse(processedResult.images);
+          } else {
+            // 处理字符串格式，但排除占位值
+            const imageValue = processedResult.images.trim();
+            if (imageValue && imageValue !== 'images' && imageValue !== '[]') {
+              parsedImages = [imageValue];
+            }
+          }
+        }
+      } catch (e) {
+        console.warn(`解析图片JSON失败: ${e}`);
+      }
+      
+      try {
+        if (processedResult.links) {
+          if (processedResult.links.startsWith('[') || processedResult.links.startsWith('{')) {
+            parsedLinks = JSON.parse(processedResult.links);
+          } else {
+            // 处理字符串格式，但排除占位值
+            const linkValue = processedResult.links.trim();
+            if (linkValue && linkValue !== 'links' && linkValue !== '[]') {
+              parsedLinks = [linkValue];
+            }
+          }
+        }
+      } catch (e) {
+        console.warn(`解析链接JSON失败: ${e}`);
+      }
+      
+      try {
+        if (processedResult.topics) {
+          if (processedResult.topics.startsWith('[') || processedResult.topics.startsWith('{')) {
+            parsedTopics = JSON.parse(processedResult.topics);
+          } else {
+            // 处理字符串格式，但排除占位值
+            const topicValue = processedResult.topics.trim();
+            if (topicValue && topicValue !== 'topics' && topicValue !== '[]') {
+              parsedTopics = [topicValue];
+            }
+          }
+        }
+      } catch (e) {
+        console.warn(`解析主题JSON失败: ${e}`);
+      }
+      
+      // 解析关键词
+      const parsedKeywords = processedResult.keywords ? processedResult.keywords.split(',').filter(k => k.trim()) : [];
+      
+      // 使用处理后的字数，过滤占位值
+      let wordCount = this.countWords(processedResult.content);
+      if (processedResult.wordCount && processedResult.wordCount !== 'word_count') {
+        wordCount = parseInt(processedResult.wordCount) || wordCount;
+      }
+      
+      // 过滤掉占位值
+      const filterPlaceholder = (value: string, placeholder: string) => {
+        return value && value.trim() !== placeholder ? value : undefined;
+      };
+
       return {
-        title: '', // 可以从rssEntries表获取
-        content: result.content,
-        cleanContent: result.content,
-        images: [],
-        links: [],
-        publishDate: undefined,
-        wordCount: result.wordCount || 0
+        title: rssEntry.title,
+        content: processedResult.content,
+        cleanContent: processedResult.content,
+        images: parsedImages,
+        links: parsedLinks,
+        publishDate: processedResult.publishTime ? new Date(processedResult.publishTime) : rssEntry.publishedAt,
+        wordCount: wordCount,
+        // 添加原始链接信息
+        url: rssEntry.link,
+        // 添加AI处理的额外信息，过滤占位值
+        summary: processedResult.summary,
+        topics: parsedTopics,
+        keywords: parsedKeywords,
+        author: filterPlaceholder(processedResult.author, 'author'),
+        source: filterPlaceholder(processedResult.source, 'source'),
+        analysis: filterPlaceholder(processedResult.analysis, 'analysis'),
+        educationalValue: filterPlaceholder(processedResult.educationalValue, 'educational_value')
       };
     } catch (error) {
-      console.error('获取网页内容失败:', error);
+      console.error('WebContentService: 获取网页内容失败:', error);
       return null;
     }
   }
