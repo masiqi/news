@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 调用后端服务进行注册
-    const backendUrl = process.env.BACKEND_URL || 'http://localhost:8787';
+    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8787';
     const response = await fetch(`${backendUrl}/auth/register`, {
       method: 'POST',
       headers: {

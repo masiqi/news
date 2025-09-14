@@ -1,12 +1,9 @@
 import { NextRequest } from 'next/server';
 import { getAuthUser } from '@/lib/auth';
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function POST(request: NextRequest) {
   try {
-    console.log(`前端API: 开始处理RSS源 ${params.id} 触发获取请求`);
+    console.log(`前端API: 开始处理RSS源触发获取请求`);
     
     const user = await getAuthUser(request);
     if (!user) {
@@ -17,7 +14,17 @@ export async function POST(
       );
     }
 
-    const sourceId = params.id;
+    // 从请求体中获取 sourceId
+    const body = await request.json();
+    const { sourceId } = body;
+
+    if (!sourceId) {
+      return new Response(
+        JSON.stringify({ error: '缺少sourceId参数' }), 
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+
     console.log(`前端API: 用户 ${user.email} 请求触发RSS源 ${sourceId} 获取`);
 
     const response = await fetch(`${process.env.BACKEND_URL}/sources/${sourceId}/trigger-fetch`, {

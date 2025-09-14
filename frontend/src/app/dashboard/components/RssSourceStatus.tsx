@@ -46,11 +46,12 @@ export default function RssSourceStatus() {
     try {
       console.log(`开始手动触发RSS源 ${sourceId} 获取`);
       
-      const response = await fetch(`/api/sources/${sourceId}/trigger-fetch`, {
+      const response = await fetch(`/api/sources/trigger-fetch`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
+        body: JSON.stringify({ sourceId }),
       });
       
       const data = await response.json();

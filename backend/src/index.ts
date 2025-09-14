@@ -7,7 +7,10 @@ import userRoutes from "./routes/users";
 import systemRoutes from "./routes/system";
 import topicsRoutes from "./routes/topics";
 import webContentRoutes from "./routes/web-content";
+import contentRoutes from "./routes/content";
 import adminRoutes from "./routes/admin";
+import reprocessRoutes from "./routes/reprocess";
+import tagsRoutes from "./routes/tags";
 // 移除测试路由导入
 import llmExtractorRoutes from "./services/llm-extractor";
 import llmContentExtractorRoutes from "./services/llm-content-extractor";
@@ -49,8 +52,18 @@ app.route("/topics", topicsRoutes);
 // 注册网页内容路由
 app.route("/web-content", webContentRoutes);
 
+// 注册内容路由
+app.route("/api/content", contentRoutes);
+
+// 注册AI重新处理路由
+app.route("/api/content/reprocess", reprocessRoutes);
+
+// 注册标签聚合路由
+app.route("/api/tags", tagsRoutes);
+
 // 注册管理员API路由
 app.route("/admin", adminRoutes);
+
 
 // 移除测试路由注册
 

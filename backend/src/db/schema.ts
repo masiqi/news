@@ -770,6 +770,80 @@ export const monitoringAggregates = sqliteTable('monitoring_aggregates', {
   uniqueMetricTimeRangeIdx: uniqueIndex('unq_monitoring_aggregates_metric_time_range_timestamp').on(table.metricType, table.timeRange, table.timestamp),
 }));
 
+// 用户主题聚合表 - 存储用户所有内容中的主题标签聚合
+export const userTopics = sqliteTable('user_topics', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  userId: integer('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  topicName: text('topic_name').notNull(), // 主题名称
+  entryCount: integer('entry_count').notNull().default(1), // 包含该主题的内容条目数量
+  lastUsedAt: integer('last_used_at', { mode: 'timestamp' }), // 最后使用时间
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
+}, (table) => ({
+  // 索引定义
+  userIdIdx: index('idx_user_topics_user_id').on(table.userId),
+  topicNameIdx: index('idx_user_topics_topic_name').on(table.topicName),
+  entryCountIdx: index('idx_user_topics_entry_count').on(table.entryCount),
+  lastUsedAtIdx: index('idx_user_topics_last_used_at').on(table.lastUsedAt),
+  createdAtIdx: index('idx_user_topics_created_at').on(table.createdAt),
+  uniqueUserTopicIdx: uniqueIndex('unq_user_topics_user_topic').on(table.userId, table.topicName),
+}));
+
+// 用户关键词聚合表 - 存储用户所有内容中的关键词标签聚合
+export const userKeywords = sqliteTable('user_keywords', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  userId: integer('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  keywordName: text('keyword_name').notNull(), // 关键词名称
+  entryCount: integer('entry_count').notNull().default(1), // 包含该关键词的内容条目数量
+  lastUsedAt: integer('last_used_at', { mode: 'timestamp' }), // 最后使用时间
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
+}, (table) => ({
+  // 索引定义
+  userIdIdx: index('idx_user_keywords_user_id').on(table.userId),
+  keywordNameIdx: index('idx_user_keywords_keyword_name').on(table.keywordName),
+  entryCountIdx: index('idx_user_keywords_entry_count').on(table.entryCount),
+  lastUsedAtIdx: index('idx_user_keywords_last_used_at').on(table.lastUsedAt),
+  createdAtIdx: index('idx_user_keywords_created_at').on(table.createdAt),
+  uniqueUserKeywordIdx: uniqueIndex('unq_user_keywords_user_keyword').on(table.userId, table.keywordName),
+}));
+
+// 主题与内容条目关联表 - 用于快速查询某个主题对应的所有内容
+export const topicEntryRelations = sqliteTable('topic_entry_relations', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  userId: integer('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  topicId: integer('topic_id').notNull().references(() => userTopics.id, { onDelete: 'cascade' }),
+  entryId: integer('entry_id').notNull().references(() => rssEntries.id, { onDelete: 'cascade' }),
+  processedContentId: integer('processed_content_id').notNull().references(() => processedContents.id, { onDelete: 'cascade' }),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+}, (table) => ({
+  // 索引定义
+  userIdIdx: index('idx_topic_entry_relations_user_id').on(table.userId),
+  topicIdIdx: index('idx_topic_entry_relations_topic_id').on(table.topicId),
+  entryIdIdx: index('idx_topic_entry_relations_entry_id').on(table.entryId),
+  processedContentIdIdx: index('idx_topic_entry_relations_processed_content_id').on(table.processedContentId),
+  createdAtIdx: index('idx_topic_entry_relations_created_at').on(table.createdAt),
+  uniqueTopicEntryIdx: uniqueIndex('unq_topic_entry_relations_topic_entry').on(table.topicId, table.entryId),
+}));
+
+// 关键词与内容条目关联表 - 用于快速查询某个关键词对应的所有内容
+export const keywordEntryRelations = sqliteTable('keyword_entry_relations', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  userId: integer('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  keywordId: integer('keyword_id').notNull().references(() => userKeywords.id, { onDelete: 'cascade' }),
+  entryId: integer('entry_id').notNull().references(() => rssEntries.id, { onDelete: 'cascade' }),
+  processedContentId: integer('processed_content_id').notNull().references(() => processedContents.id, { onDelete: 'cascade' }),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+}, (table) => ({
+  // 索引定义
+  userIdIdx: index('idx_keyword_entry_relations_user_id').on(table.userId),
+  keywordIdIdx: index('idx_keyword_entry_relations_keyword_id').on(table.keywordId),
+  entryIdIdx: index('idx_keyword_entry_relations_entry_id').on(table.entryId),
+  processedContentIdIdx: index('idx_keyword_entry_relations_processed_content_id').on(table.processedContentId),
+  createdAtIdx: index('idx_keyword_entry_relations_created_at').on(table.createdAt),
+  uniqueKeywordEntryIdx: uniqueIndex('unq_keyword_entry_relations_keyword_entry').on(table.keywordId, table.entryId),
+}));
+
 // 系统事件日志表
 export const systemEventLogs = sqliteTable('system_event_logs', {
   id: integer('id').primaryKey({ autoIncrement: true }),

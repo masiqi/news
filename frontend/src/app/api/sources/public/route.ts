@@ -4,7 +4,7 @@ import { NextRequest } from 'next/server';
 export async function GET(request: NextRequest) {
   try {
     // 转发请求到后端服务
-    const backendUrl = process.env.BACKEND_URL || 'http://localhost:8787';
+    const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8787';
     const response = await fetch(`${backendUrl}/sources/public`);
     
     const data = await response.json();
