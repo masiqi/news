@@ -292,6 +292,23 @@ export class CryptoService {
   }
 
   /**
+   * 哈希数据（用于密码和敏感信息存储）
+   */
+  async hashData(data: string): Promise<string> {
+    try {
+      // 使用简单的哈希算法（生产环境应使用bcrypt或argon2）
+      const encoder = new TextEncoder();
+      const dataBuffer = encoder.encode(data + this.ENCRYPTION_KEY);
+      const hashBuffer = await crypto.subtle.digest('SHA-256', dataBuffer);
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    } catch (error) {
+      console.error('数据哈希失败:', error);
+      throw new Error(`哈希失败: ${error instanceof Error ? error.message : '未知错误'}`);
+    }
+  }
+
+  /**
    * 清理敏感数据的内存
    */
   secureWipe(data: string): void {
@@ -304,9 +321,8 @@ export class CryptoService {
           data = data.substring(0, i) + '0' + data.substring(i + 1);
         }
       }
-    }
       
-    console.log('敏感数据已安全擦除');
+      console.log('敏感数据已安全擦除');
       
     } catch (error) {
       console.error('安全擦除敏感数据失败:', error);

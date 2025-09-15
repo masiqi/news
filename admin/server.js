@@ -31,8 +31,16 @@ const server = http.createServer((req, res) => {
     return;
   }
   
-  // 处理API和Admin代理请求
-  if ((pathname.startsWith('/api/') || pathname.startsWith('/admin/') || pathname.startsWith('/sources/') || pathname.startsWith('/system/') || pathname.startsWith('/llm-extractor/') || pathname.startsWith('/llm-content-extractor/') || pathname.startsWith('/topics/') || pathname.startsWith('/web-content/')) && (req.method === 'GET' || req.method === 'POST' || req.method === 'PUT' || req.method === 'DELETE' || req.method === 'PATCH')) {
+  // 处理API和Admin代理请求 - 只处理特定的API路径
+  const apiPaths = ['/api/', '/admin/', '/auth/', '/sources/', '/system/', '/llm-extractor/', '/llm-content-extractor/', '/topics/', '/web-content/'];
+  const isApiRequest = apiPaths.some(apiPath => pathname.startsWith(apiPath)) && 
+                       (req.method === 'GET' || req.method === 'POST' || req.method === 'PUT' || req.method === 'DELETE' || req.method === 'PATCH');
+  
+  // 排除一些可能的前端路由路径
+  const frontendRoutes = ['/users/list', '/users/statistics', '/content/sources', '/content/articles', '/content/categories', '/system/statistics', '/system/logs', '/system/config'];
+  const isFrontendRoute = frontendRoutes.some(route => pathname.startsWith(route));
+  
+  if (isApiRequest && !isFrontendRoute) {
     // 构造后端API的路径 - 对于/api/前缀的请求，去掉/api前缀
     let backendPath = pathname;
     if (pathname.startsWith('/api/')) {
@@ -114,9 +122,11 @@ const server = http.createServer((req, res) => {
     return;
   }
   
-  // 静态文件服务
+  // 静态文件服务 - 支持前端单页应用路由
   let filePath = '.' + pathname;
-  if (filePath === './') {
+  
+  // 如果是根路径或者没有扩展名的路径（前端路由），返回index.html
+  if (filePath === './' || !path.extname(filePath)) {
     filePath = './index.html';
   }
   

@@ -34,75 +34,29 @@ export interface CredentialLog {
   details?: Record<string, any>;
 }
 
-export interface CredentialAPI {
-  // 创建凭证
-  POST /api/credentials: {
-    body: { name: string };
-    response: { credential: SyncCredential };
-  }
-  
-  // 获取用户凭证列表
-  GET /api/credentials: {
-    response: { credentials: SyncCredential[] };
-  }
-  
-  // 获取凭证详情
-  GET /api/credentials/:id: {
-    params: { id: string };
-    response: { credential: SyncCredential };
-  }
-  
-  // 撤销凭证
-  DELETE /api/credentials/:id: {
-    params: { id: string };
-    response: { success: boolean; message: string };
-  }
-  
-  // 重新生成凭证
-  POST /api/credentials/:id/regenerate: {
-    params: { id: string };
-    response: { credential: SyncCredential };
-  }
-  
-  // 获取凭证统计
-  GET /api/credentials/stats: {
-    response: {
-      totalCredentials: number;
-      activeCredentials: number;
-      expiredCredentials: number;
-      mostRecentlyUsed: SyncCredential | null;
-    };
-  }
-  
-  // 验证凭证
-  POST /api/credentials/:id/validate: {
-    params: { id: string };
-    body: { accessKeyId: string; secretAccessKey: string; region: string; bucket: string; };
-    response: {
-      isValid: boolean;
-      credential?: SyncCredential;
-      error?: string;
-    };
-  }
-  
-  // 记录凭证使用
-  POST /api/credentials/:id/usage: {
-    params: { id: string };
-    body: { details?: Record<string, any> };
-    response: { success: boolean; message: string };
-  }
-  
-  // 获取配置说明
-  GET /api/credentials/guide/:platform: {
-    params: { platform: 'obsidian' | 'logseq' | 'other' };
-    response: { guide: ConfigurationGuide };
-  }
-  
-  // 获取审计日志
-  GET /api/credentials/logs: {
-    query: { limit?: number; offset?: number; action?: string; };
-    response: { logs: CredentialLog[]; total: number };
-  }
+// API端点类型定义
+export interface CreateCredentialResponse {
+  success: boolean;
+  message: string;
+  credential: SyncCredential;
+}
+
+export interface GetCredentialsResponse {
+  success: boolean;
+  credentials: SyncCredential[];
+  total: number;
+}
+
+export interface CredentialStatsResponse {
+  success: boolean;
+  stats: CredentialStats;
+}
+
+export interface ValidateCredentialResponse {
+  success: boolean;
+  isValid: boolean;
+  message: string;
+  error?: string;
 }
 
 export interface ConfigurationGuide {

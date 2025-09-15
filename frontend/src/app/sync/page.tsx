@@ -17,7 +17,9 @@ import {
   ExternalLink,
   CheckCircle,
   AlertCircle,
-  Clock
+  Clock,
+  RefreshCw,
+  Plus
 } from 'lucide-react';
 
 // 同步配置类型

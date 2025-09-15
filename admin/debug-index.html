@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>调试版本 - 管理后台</title>
+    <script src="https://cdn.jsdelivr.net/npm/amis@6.13.0/sdk/sdk.js"></script>
+    <style>
+        .debug-panel {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            width: 300px;
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            padding: 10px;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 400px;
+            overflow-y: auto;
+            z-index: 9999;
+        }
+        .debug-log {
+            margin: 2px 0;
+            padding: 2px 4px;
+            border-bottom: 1px solid #e9ecef;
+        }
+        .debug-log.info { color: #0066cc; }
+        .debug-log.success { color: #28a745; }
+        .debug-log.error { color: #dc3545; }
+        .debug-log.warning { color: #ffc107; }
+    </style>
+</head>
+<body>
+    <div id="debug-panel" class="debug-panel">
+        <h4>🔍 调试面板</h4>
+        <div id="debug-logs"></div>
+    </div>
+    <div id="root"></div>
+
+    <script>
+        // 调试日志函数
+        function debugLog(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logDiv = document.createElement('div');
+            logDiv.className = `debug-log ${type}`;
+            logDiv.innerHTML = `[${timestamp}] ${message}`;
+            
+            const logsContainer = document.getElementById('debug-logs');
+            logsContainer.appendChild(logDiv);
+            logsContainer.scrollTop = logsContainer.scrollHeight;
+            
+            console.log(`[DEBUG ${type.toUpperCase()}] ${message}`);
+        }
+
+        // 全局变量
+        let amisInstance = null;
+        let currentHash = '';
+        let clickCount = 0;
+
+        // 获取token
+        function getToken() {
+            return localStorage.getItem('admin_token');
+        }
+
+        // 简化的fetcher
+        const fetcher = (api) => {
+            debugLog(`API请求: ${api.url}`, 'info');
+            
+            return {
+                method: api.method || 'get',
+                url: api.url,
+                headers: {
+                    'Authorization': 'Bearer ' + getToken(),
+                    'Content-Type': 'application/json'
+                },
+                data: api.data,
+                withCredentials: false
+            };
+        };
+
+        // 获取页面配置函数
+        function getHomePageConfig() {
+            debugLog('加载首页配置', 'info');
+            return {
+                type: 'page',
+                title: '首页',
+                body: {
+                    type: 'tpl',
+                    tpl: '<h2>欢迎使用AI资讯平台管理后台</h2><p>当前Hash: ' + window.location.hash + '</p>'
+                }
+            };
+        }
+
+        function getUsersPageConfig() {
+            debugLog('加载用户管理页面配置', 'info');
+            return {
+                type: 'page',
+                title: '用户管理',
+                body: {
+                    type: 'crud',
+                    api: {
+                        method: 'get',
+                        url: '/admin/users'
+                    },
+                    columns: [
+                        { name: 'id', label: 'ID' },
+                        { name: 'username', label: '用户名' },
+                        { name: 'email', label: '邮箱' }
+                    ]
+                }
+            };
+        }
+
+        function getSourcesPageConfig() {
+            debugLog('加载RSS源管理页面配置', 'info');
+            return {
+                type: 'page',
+                title: 'RSS源管理',
+                body: {
+                    type: 'crud',
+                    api: {
+                        method: 'get',
+                        url: '/admin/sources'
+                    },
+                    columns: [
+                        { name: 'id', label: 'ID' },
+                        { name: 'name', label: '名称' },
+                        { name: 'url', label: 'URL' }
+                    ]
+                }
+            };
+        }
+
+        function getContentsPageConfig() {
+            debugLog('加载内容管理页面配置', 'info');
+            return {
+                type: 'page',
+                title: '内容管理',
+                body: {
+                    type: 'tpl',
+                    tpl: '<h2>内容管理页面</h2><p>当前Hash: ' + window.location.hash + '</p>'
+                }
+            };
+        }
+
+        function getSystemPageConfig() {
+            debugLog('加载系统监控页面配置', 'info');
+            return {
+                type: 'page',
+                title: '系统监控',
+                body: {
+                    type: 'tpl',
+                    tpl: '<h2>系统监控页面</h2><p>当前Hash: ' + window.location.hash + '</p>'
+                }
+            };
+        }
+
+        // 渲染主页面
+        function renderMainPage() {
+            const token = getToken();
+            if (!token) {
+                debugLog('未找到token，跳转到登录', 'warning');
+                window.location.href = '/';
+                return;
+            }
+
+            currentHash = window.location.hash.substring(1) || '/home';
+            debugLog(`渲染主页面，当前Hash: ${currentHash}`, 'info');
+
+            const mainPageConfig = {
+                type: 'page',
+                title: 'AI资讯平台管理后台 (调试版)',
+                toolbar: {
+                    type: 'tpl',
+                    tpl: '<div class="pull-right"><button class="btn btn-link" onclick="logout()">登出</button></div>'
+                },
+                body: {
+                    type: 'grid',
+                    columns: [
+                        {
+                            md: 3,
+                            body: {
+                                type: 'wrapper',
+                                className: 'bg-light padder-v',
+                                body: {
+                                    type: 'nav',
+                                    stacked: true,
+                                    className: 'nav-pills nav-stacked',
+                                    links: [
+                                        {
+                                            label: '首页',
+                                            icon: 'fa fa-home',
+                                            active: currentHash === '/home',
+                                            onClick: {
+                                                actionType: 'url',
+                                                url: '#/home',
+                                                blank: false
+                                            }
+                                        },
+                                        {
+                                            label: '用户管理',
+                                            icon: 'fa fa-users',
+                                            active: currentHash === '/users',
+                                            onClick: {
+                                                actionType: 'url',
+                                                url: '#/users',
+                                                blank: false
+                                            }
+                                        },
+                                        {
+                                            label: 'RSS源管理',
+                                            icon: 'fa fa-rss',
+                                            active: currentHash === '/sources',
+                                            onClick: {
+                                                actionType: 'url',
+                                                url: '#/sources',
+                                                blank: false
+                                            }
+                                        },
+                                        {
+                                            label: '内容管理',
+                                            icon: 'fa fa-newspaper-o',
+                                            active: currentHash === '/contents',
+                                            onClick: {
+                                                actionType: 'url',
+                                                url: '#/contents',
+                                                blank: false
+                                            }
+                                        },
+                                        {
+                                            label: '系统监控',
+                                            icon: 'fa fa-dashboard',
+                                            active: currentHash === '/system',
+                                            onClick: {
+                                                actionType: 'url',
+                                                url: '#/system',
+                                                blank: false
+                                            }
+                                        }
+                                    ]
+                                }
+                            }
+                        },
+                        {
+                            md: 9,
+                            body: [
+                                {
+                                    type: 'wrapper',
+                                    visibleOn: `window.location.hash === "#/home"`,
+                                    body: getHomePageConfig().body
+                                },
+                                {
+                                    type: 'wrapper', 
+                                    visibleOn: `window.location.hash === "#/users"`,
+                                    body: getUsersPageConfig().body
+                                },
+                                {
+                                    type: 'wrapper',
+                                    visibleOn: `window.location.hash === "#/sources"`, 
+                                    body: getSourcesPageConfig().body
+                                },
+                                {
+                                    type: 'wrapper',
+                                    visibleOn: `window.location.hash === "#/contents"`,
+                                    body: getContentsPageConfig().body
+                                },
+                                {
+                                    type: 'wrapper',
+                                    visibleOn: `window.location.hash === "#/system"`,
+                                    body: getSystemPageConfig().body
+                                }
+                            ]
+                        }
+                    ]
+                }
+            };
+
+            debugLog('开始渲染AMIS页面', 'info');
+            
+            try {
+                const amis = amisRequire('amis/embed');
+                
+                // 清理旧实例
+                if (amisInstance) {
+                    debugLog('清理旧AMIS实例', 'info');
+                    const rootElement = document.getElementById('root');
+                    rootElement.innerHTML = '';
+                }
+                
+                amisInstance = amis.embed('#root', mainPageConfig, {}, fetcher);
+                debugLog('AMIS页面渲染成功', 'success');
+                
+            } catch (error) {
+                debugLog(`AMIS渲染错误: ${error.message}`, 'error');
+                console.error('AMIS渲染错误:', error);
+            }
+        }
+
+        // Hash变化处理
+        function handleHashChange() {
+            debugLog(`Hash变化: ${window.location.hash}`, 'info');
+            renderMainPage();
+        }
+
+        // 登出函数
+        function logout() {
+            debugLog('用户登出', 'info');
+            localStorage.removeItem('admin_token');
+            localStorage.removeItem('admin_logged_in');
+            window.location.reload();
+        }
+
+        // 页面加载时初始化
+        window.addEventListener('load', function() {
+            debugLog('页面加载完成', 'info');
+            debugLog(`初始Hash: ${window.location.hash}`, 'info');
+            debugLog(`Token存在: ${!!getToken()}`, 'info');
+            
+            if (getToken()) {
+                debugLog('用户已登录，初始化主页面', 'success');
+                renderMainPage();
+                window.addEventListener('hashchange', handleHashChange);
+            } else {
+                debugLog('用户未登录', 'warning');
+                window.location.href = '/';
+            }
+        });
+
+        // 添加额外的调试信息
+        window.addEventListener('click', function(event) {
+            clickCount++;
+            debugLog(`全局点击事件 #${clickCount}: ${event.target.tagName}.${event.target.className}`, 'info');
+        });
+    </script>
+</body>
+</html>

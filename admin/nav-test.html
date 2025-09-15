@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>AMIS导航测试</title>
+    <script src="https://cdn.jsdelivr.net/npm/amis@6.13.0/sdk/sdk.js"></script>
+    <style>
+        .nav-test {
+            margin: 20px;
+            padding: 20px;
+            border: 1px solid #ddd;
+        }
+        .nav-item {
+            display: block;
+            padding: 10px;
+            margin: 5px 0;
+            background: #f0f0f0;
+            cursor: pointer;
+            text-decoration: none;
+            color: #333;
+        }
+        .nav-item:hover {
+            background: #e0e0e0;
+        }
+        .nav-item.active {
+            background: #007bff;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="nav-test">
+        <h2>测试Hash导航</h2>
+        <div id="nav-menu">
+            <a href="#/home" class="nav-item" onclick="testNav('home')">首页</a>
+            <a href="#/users" class="nav-item" onclick="testNav('users')">用户管理</a>
+            <a href="#/sources" class="nav-item" onclick="testNav('sources')">RSS源管理</a>
+            <a href="#/contents" class="nav-item" onclick="testNav('contents')">内容管理</a>
+            <a href="#/system" class="nav-item" onclick="testNav('system')">系统监控</a>
+        </div>
+        
+        <h3>当前Hash: <span id="current-hash">#/home</span></h3>
+        <h3>点击次数: <span id="click-count">0</span></h3>
+        
+        <div id="amis-container"></div>
+    </div>
+
+    <script>
+        let clickCount = 0;
+        
+        function testNav(page) {
+            clickCount++;
+            console.log(`点击了 ${page} 页面，第 ${clickCount} 次点击`);
+            
+            // 更新hash
+            window.location.hash = `#/${page}`;
+            
+            // 更新显示
+            document.getElementById('current-hash').textContent = window.location.hash;
+            document.getElementById('click-count').textContent = clickCount;
+            
+            // 更新活动状态
+            document.querySelectorAll('.nav-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            
+            // 测试AMIS渲染
+            testAmisRender(page);
+            
+            // 阻止默认行为，看看是否有影响
+            event.preventDefault();
+            return false;
+        }
+        
+        function testAmisRender(page) {
+            console.log(`测试AMIS渲染 ${page} 页面`);
+            
+            const config = {
+                type: 'page',
+                title: `测试页面 - ${page}`,
+                body: {
+                    type: 'tpl',
+                    tpl: `<h2>这是 ${page} 页面的测试内容</h2><p>当前Hash: ${window.location.hash}</p><p>时间: ${new Date().toLocaleString()}</p>`
+                }
+            };
+            
+            try {
+                const amis = amisRequire('amis/embed');
+                amis.embed('#amis-container', config);
+                console.log('AMIS渲染成功');
+            } catch (error) {
+                console.error('AMIS渲染错误:', error);
+                document.getElementById('amis-container').innerHTML = `<div style="color: red;">AMIS渲染错误: ${error.message}</div>`;
+            }
+        }
+        
+        // 监听hash变化
+        window.addEventListener('hashchange', function() {
+            console.log('Hash变化事件触发:', window.location.hash);
+            document.getElementById('current-hash').textContent = window.location.hash;
+        });
+        
+        // 页面加载时初始化
+        window.addEventListener('load', function() {
+            console.log('页面加载完成，初始Hash:', window.location.hash);
+            document.getElementById('current-hash').textContent = window.location.hash;
+            
+            // 测试初始AMIS渲染
+            testAmisRender('home');
+        });
+    </script>
+</body>
+</html>

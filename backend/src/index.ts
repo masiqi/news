@@ -9,8 +9,13 @@ import topicsRoutes from "./routes/topics";
 import webContentRoutes from "./routes/web-content";
 import contentRoutes from "./routes/content";
 import adminRoutes from "./routes/admin";
+import adminMarkdownRoutes from "./routes/admin-markdown-simple";
 import reprocessRoutes from "./routes/reprocess";
 import tagsRoutes from "./routes/tags";
+import userAccessRoutes from "./routes/user-access";
+import adminAccessRoutes from "./routes/admin-access";
+import autoStorageRoutes from "./routes/auto-storage";
+import credentialRoutes from "./routes/credentials";
 // 移除测试路由导入
 import llmExtractorRoutes from "./services/llm-extractor";
 import llmContentExtractorRoutes from "./services/llm-content-extractor";
@@ -18,6 +23,7 @@ import { drizzle } from 'drizzle-orm/d1';
 import { rssEntries, sources, processedContents } from './db/schema';
 import { eq, and, isNull } from 'drizzle-orm';
 import { ContentCacheService } from './services/content-cache.service';
+import { UnifiedLLMService } from './services/unified-llm.service';
 import Parser from 'rss-parser';
 
 const app = new Hono<{ Bindings: CloudflareBindings }>();
@@ -64,6 +70,17 @@ app.route("/api/tags", tagsRoutes);
 // 注册管理员API路由
 app.route("/admin", adminRoutes);
 
+// 注册管理员Markdown管理路由
+app.route("/admin/markdown", adminMarkdownRoutes);
+
+// 注册用户访问控制API路由
+app.route("/api/user", userAccessRoutes);
+
+// 注册管理员访问控制API路由
+app.route("/api/admin", adminAccessRoutes);
+
+// 注册自动存储API路由
+app.route("/api", autoStorageRoutes);
 
 // 移除测试路由注册
 
@@ -155,94 +172,55 @@ async function processRssFetch(sourceId: number, rssUrl: string, env: Cloudflare
           console.log(`新条目已保存: ${entry.title}`);
         }
 
-        // 触发网页内容抓取和主题提取
-        if (env.AI) {
+        // 使用统一LLM服务进行完整的内容分析
+        if (env.ZHIPUAI_API_KEY) {
           try {
-            console.log(`开始为条目 ${rssEntry.id} 抓取网页内容`);
+            console.log(`开始为条目 ${rssEntry.id} 进行统一LLM分析`);
             
-            // 如果有链接，先抓取网页内容
+            // 准备分析内容
+            let contentForAnalysis = entry.content;
+            let webContentFetched = false;
+            
+            // 如果有链接，先尝试抓取完整的网页内容
             if (entry.link) {
               try {
-                // 动态导入WebContentService以避免循环依赖
-                const { WebContentService } = require('../services/web-content.service');
-                const webContentService = new WebContentService(db);
+                console.log(`🌐 尝试抓取完整网页内容: ${entry.link}`);
                 
-                const parsedContent = await webContentService.fetchAndParseWebContent(rssEntry.id, entry.link);
-                console.log(`网页内容抓取完成，标题: ${parsedContent.title}，字数: ${parsedContent.wordCount}`);
-              } catch (webError) {
-                console.error(`网页内容抓取失败，继续使用RSS原始内容:`, webError);
-              }
-            }
-            
-            // 现在进行主题提取
-            console.log(`开始为条目 ${rssEntry.id} 提取主题`);
-            const { run } = env.AI;
-            const startTime = Date.now();
-            
-            // 构建主题提取提示
-            const prompt = `你是一个专业的新闻主题分析专家。你的任务是从中文新闻内容中提取关键主题和关键词。要求：1. 提取3-5个最主要的主题；2. 每个主题应该简洁明了（2-6个字）；3. 提取5-10个关键词；4. 输出必须是JSON格式；5. 主题要覆盖新闻的核心内容。
+                const response = await fetch(entry.link, {
+                  headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124',
+                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+                    'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+                  }
+                });
 
-新闻标题：${entry.title}
-新闻内容：
-${entry.content.substring(0, 2000)}
-
-请从上述新闻内容中提取主题和关键词，并以JSON格式返回，结构如下：
-{
-  "topics": ["主题1", "主题2", "主题3"],
-  "keywords": ["关键词1", "关键词2", "关键词3", "关键词4", "关键词5"]
-}
-
-要求：
-1. 主题应该简洁、准确，覆盖新闻的核心内容
-2. 关键词应该是文章中的重要名词、术语或概念
-3. 只返回JSON，不要包含其他解释`;
-
-            const response = await run({
-              model: "@cf/meta/llama-3.1-8b-instruct-fast",
-              messages: [
-                {
-                  role: "system",
-                  content: "你是一个专业的新闻主题分析专家。你的任务是从中文新闻内容中提取关键主题和关键词。"
-                },
-                {
-                  role: "user", 
-                  content: prompt
+                if (response.ok) {
+                  const html = await response.text();
+                  contentForAnalysis = html;
+                  webContentFetched = true;
+                  console.log(`✅ 网页抓取成功，使用HTML内容进行分析，长度: ${html.length} 字符`);
                 }
-              ],
-              temperature: 0.3,
-              max_tokens: 500
-            });
-
-            const endTime = Date.now();
-            console.log(`条目 ${rssEntry.id} 主题提取完成，耗时: ${endTime - startTime}ms`);
-
-            // 解析并保存主题结果
-            const resultText = response.response;
-            const jsonMatch = resultText.match(/\{[\s\S]*\}/);
-            
-            if (jsonMatch) {
-              const parsed = JSON.parse(jsonMatch[0]);
-              
-              if (Array.isArray(parsed.topics) && Array.isArray(parsed.keywords)) {
-                const db = drizzle(env.DB);
-                
-                // 序列化主题为JSON字符串
-                const topicsJson = JSON.stringify(parsed.topics.slice(0, 5));
-                const keywordsString = parsed.keywords.slice(0, 10).join(',');
-                
-                // 更新processed_contents表
-                await db.update(processedContents)
-                  .set({
-                    topics: topicsJson,
-                    keywords: keywordsString
-                  })
-                  .where(eq(processedContents.entryId, rssEntry.id));
-                
-                console.log(`条目 ${rssEntry.id} 主题已保存: ${parsed.topics.join(', ')}`);
+              } catch (webError) {
+                console.error(`❌ 网页内容抓取失败，将使用RSS原始内容:`, webError);
               }
             }
-          } catch (topicError) {
-            console.error(`条目 ${rssEntry.id} 主题提取失败:`, topicError);
+            
+            // 使用统一LLM服务进行分析
+            await UnifiedLLMService.analyzeAndSave({
+              entryId: rssEntry.id,
+              title: entry.title,
+              content: contentForAnalysis,
+              link: entry.link,
+              isHtml: webContentFetched,
+              apiKey: env.ZHIPUAI_API_KEY,
+              db: db
+            });
+            
+            console.log(`✅ 条目 ${rssEntry.id} 统一LLM分析完成`);
+            
+          } catch (analysisError) {
+            console.error(`条目 ${rssEntry.id} LLM分析失败:`, analysisError);
+            // 继续处理其他条目，不因为单个条目失败而中断整个流程
           }
         }
       } catch (entryError) {

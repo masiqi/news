@@ -13,7 +13,7 @@ export interface ModelConfig {
 
 export interface TopicExtractionModelConfig {
   model: string;
-  bindingName: string; // 简化为字符串，因为只有一个AI绑定
+  bindingName: string; // 简化为字符串，因为只有一个API密钥绑定
   temperature: number;
   maxTokens: number;
 }
@@ -30,54 +30,34 @@ export class ModelConfigService {
   static getAvailableModels(): ModelConfig[] {
     return [
       {
-        id: 'llama-3.1-fast',
-        name: 'Llama 3.1 Fast',
-        model: '@cf/meta/llama-3.1-8b-instruct-fast',
-        description: 'Meta最新的3.1B模型，优化为速度和效率',
+        id: 'glm-4-flash',
+        name: 'GLM-4 Flash',
+        model: 'glm-4-flash',
+        description: '智谱GLM-4 Flash模型，高性能轻量级模型，速度快且成本低',
         category: 'fast',
-        maxTokens: 131072,
-        contextWindow: 8192,
+        maxTokens: 128000,
+        contextWindow: 128000,
+        unitPrice: 0.0005
+      },
+      {
+        id: 'glm-4-air',
+        name: 'GLM-4 Air',
+        model: 'glm-4-air',
+        description: '智谱GLM-4 Air模型，平衡性能与成本，适用于大多数场景',
+        category: 'balanced',
+        maxTokens: 128000,
+        contextWindow: 128000,
+        unitPrice: 0.001
+      },
+      {
+        id: 'glm-4',
+        name: 'GLM-4',
+        model: 'glm-4',
+        description: '智谱GLM-4标准模型，强大的推理能力和多语言支持',
+        category: 'accurate',
+        maxTokens: 128000,
+        contextWindow: 128000,
         unitPrice: 0.002
-      },
-      {
-        id: 'mistral-7b-v0.2',
-        name: 'Mistral 7B v0.2',
-        model: '@cf/mistral/mistral-7b-instruct-v0.2',
-        description: 'Mistral最新的7B模型，Beta版本，性能优异',
-        category: 'balanced',
-        maxTokens: 32768,
-        contextWindow: 32768,
-        unitPrice: 0.005
-      },
-      {
-        id: 'mistral-7b-v0.1',
-        name: 'Mistral 7B v0.1',
-        model: '@cf/mistral/mistral-7b-instruct-v0.1',
-        description: 'Mistral稳定的7B模型，生产环境推荐',
-        category: 'balanced',
-        maxTokens: 32768,
-        contextWindow: 32768,
-        unitPrice: 0.005
-      },
-      {
-        id: 'gpt-oss-20b',
-        name: 'GPT-OSS 20B',
-        model: '@cf/gpt-oss-20b',
-        description: 'OpenAI开源的20B模型，强大的推理能力',
-        category: 'accurate',
-        maxTokens: 8192,
-        contextWindow: 8192,
-        unitPrice: 0.008
-      },
-      {
-        id: 'llama-4-scout',
-        name: 'Llama 4 Scout',
-        model: '@cf/meta/llama-4-scout-17b-16e-instruct',
-        description: 'Meta最新的4 Scout模型，多模态支持',
-        category: 'accurate',
-        maxTokens: 131072,
-        contextWindow: 131072,
-        unitPrice: 0.027
       }
     ];
   }
@@ -91,8 +71,8 @@ export class ModelConfigService {
       case 'topic-extraction':
         // 主题提取需要速度快、成本效益好的模型
         return {
-          model: '@cf/meta/llama-3.1-8b-instruct-fast',
-          bindingName: 'AI',
+          model: 'glm-4-flash',
+          bindingName: 'ZHIPUAI_API_KEY',
           temperature: 0.3,
           maxTokens: 500
         };
@@ -100,8 +80,8 @@ export class ModelConfigService {
       case 'summarization':
         // 摘要生成需要中等性能和准确性的模型
         return {
-          model: '@cf/meta/llama-3.1-8b-instruct-fast',
-          bindingName: 'AI',
+          model: 'glm-4-air',
+          bindingName: 'ZHIPUAI_API_KEY',
           temperature: 0.5,
           maxTokens: 800
         };
@@ -109,8 +89,8 @@ export class ModelConfigService {
       case 'classification':
         // 分类任务需要高准确性的模型
         return {
-          model: '@cf/meta/llama-3.1-8b-instruct-fast',
-          bindingName: 'AI',
+          model: 'glm-4',
+          bindingName: 'ZHIPUAI_API_KEY',
           temperature: 0.2,
           maxTokens: 300
         };
@@ -118,8 +98,8 @@ export class ModelConfigService {
       default:
         // 默认使用平衡的配置
         return {
-          model: '@cf/meta/llama-3.1-8b-instruct-fast',
-          bindingName: 'AI',
+          model: 'glm-4-flash',
+          bindingName: 'ZHIPUAI_API_KEY',
           temperature: 0.3,
           maxTokens: 500
         };
@@ -130,8 +110,8 @@ export class ModelConfigService {
    * 获取最佳绑定名称
    */
   static getOptimalBinding(modelId: string): string {
-    // 目前只有一个AI绑定，直接返回'AI'
-    return 'AI';
+    // 目前只有一个API密钥绑定，直接返回'ZHIPUAI_API_KEY'
+    return 'ZHIPUAI_API_KEY';
   }
   
   /**
@@ -155,23 +135,20 @@ export class ModelConfigService {
     const models = this.getAvailableModels();
     
     return models.map(model => {
-      // 速度评分：基于模型大小和架构
-      const speed = model.id.includes('fast') ? 9 : 
-                     model.id.includes('3.1') ? 8 :
-                     model.id.includes('7b') ? 7 :
-                     model.id.includes('20b') ? 5 : 6;
+      // 速度评分：基于模型类型
+      const speed = model.id.includes('flash') ? 10 : 
+                     model.id.includes('air') ? 8 :
+                     model.id.includes('glm-4') ? 6 : 7;
       
-      // 准确性评分：基于模型大小和训练数据
-      const accuracy = model.id.includes('20b') ? 9 :
-                      model.id.includes('4-scout') ? 9 :
-                      model.id.includes('mistral') ? 8 :
-                      model.id.includes('3.1') ? 6 : 7;
+      // 准确性评分：基于模型性能
+      const accuracy = model.id.includes('glm-4') ? 9 :
+                      model.id.includes('air') ? 7 :
+                      model.id.includes('flash') ? 6 : 8;
       
       // 成本评分：基于价格，反向计算
-      const cost = model.unitPrice <= 0.002 ? 9 :
-                     model.unitPrice <= 0.005 ? 7 :
-                     model.unitPrice <= 0.008 ? 5 :
-                     model.unitPrice <= 0.027 ? 3 : 1;
+      const cost = model.unitPrice <= 0.0005 ? 10 :
+                     model.unitPrice <= 0.001 ? 8 :
+                     model.unitPrice <= 0.002 ? 6 : 4;
       
       // 综合评分
       const overall = (speed * 0.3) + (accuracy * 0.5) + (cost * 0.2);

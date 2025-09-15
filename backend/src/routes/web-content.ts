@@ -3,7 +3,7 @@ import { Hono } from "hono";
 import { WebContentService, ParsedNewsContent } from "../services/web-content.service";
 import { drizzle } from 'drizzle-orm/d1';
 import { rssEntries, processedContents } from '../db/schema';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 
 const webContentRoutes = new Hono<{ Bindings: CloudflareBindings }>();
 
@@ -53,6 +53,48 @@ webContentRoutes.get("/fetch/:entryId", async (c) => {
     console.error('网页内容抓取失败:', error);
     return c.json({ 
       error: "网页内容抓取失败", 
+      details: error instanceof Error ? error.message : '未知错误'
+    }, 500);
+  }
+});
+
+// 获取网页内容统计
+webContentRoutes.get("/stats", async (c) => {
+  const db = drizzle(c.env.DB);
+  
+  try {
+    // 获取基本的网页内容统计
+    const stats = await db.select({
+        totalEntries: sql`COUNT(*)`,
+        withWebContent: sql`COUNT(CASE WHEN markdown_content IS NOT NULL AND markdown_content != "" THEN 1 END)`,
+        withoutWebContent: sql`COUNT(CASE WHEN markdown_content IS NULL OR markdown_content = "" THEN 1 END)`,
+        avgWordCount: sql`AVG(CASE WHEN word_count > 0 THEN word_count ELSE NULL END)`,
+        maxWordCount: sql`MAX(word_count)`,
+        minWordCount: sql`MIN(word_count)`
+      })
+      .from(rssEntries)
+      .innerJoin(processedContents, eq(rssEntries.id, processedContents.entryId))
+      .all();
+
+    return c.json({
+      success: true,
+      data: {
+        stats: stats[0] || {},
+        insights: {
+          contentCoverage: stats[0] ? ((stats[0].withWebContent / stats[0].totalEntries * 100)).toFixed(2) + '%' : '0%',
+          avgContentLength: stats[0] && stats[0].avgWordCount ? Math.round(stats[0].avgWordCount) : 0,
+          contentLengthDistribution: {
+            short: stats[0] && stats[0].totalEntries ? Math.round(stats[0].totalEntries * 0.2) : 0, // 20%
+            medium: stats[0] && stats[0].totalEntries ? Math.round(stats[0].totalEntries * 0.6) : 0, // 60%
+            long: stats[0] && stats[0].totalEntries ? Math.round(stats[0].totalEntries * 0.2) : 0 // 20%
+          }
+        }
+      }
+    });
+  } catch (error) {
+    console.error('获取网页内容统计失败:', error);
+    return c.json({ 
+      error: "获取网页内容统计失败", 
       details: error instanceof Error ? error.message : '未知错误'
     }, 500);
   }
@@ -168,45 +210,6 @@ webContentRoutes.post("/batch-fetch", async (c) => {
   }
 });
 
-// 获取已保存的网页内容
-webContentRoutes.get("/:entryId", async (c) => {
-  const entryId = parseInt(c.req.param('entryId'));
-  
-  if (isNaN(entryId)) {
-    return c.json({ error: "无效的条目ID" }, 400);
-  }
-
-  console.log(`路由层: 开始处理条目 ${entryId} 的请求`);
-  
-  const webContentService = new WebContentService(c.env.DB);
-  
-  try {
-    console.log(`路由层: 调用 WebContentService.getWebContent(${entryId})`);
-    const webContent = await webContentService.getWebContent(entryId);
-    
-    if (!webContent) {
-      console.log(`路由层: WebContentService 返回 null，条目 ${entryId} 的网页内容不存在`);
-      return c.json({ error: "网页内容不存在" }, 404);
-    }
-    
-    console.log(`路由层: 成功获取条目 ${entryId} 的网页内容，长度: ${webContent.content.length}`);
-    
-    return c.json({
-      success: true,
-      data: {
-        entryId,
-        ...webContent
-      }
-    });
-  } catch (error) {
-    console.error('路由层: 获取网页内容失败:', error);
-    return c.json({ 
-      error: "获取网页内容失败", 
-      details: error instanceof Error ? error.message : '未知错误'
-    }, 500);
-  }
-});
-
 // 检查条目和内容状态
 webContentRoutes.get("/check-entry/:entryId", async (c) => {
   const entryId = parseInt(c.req.param('entryId'));
@@ -261,43 +264,40 @@ webContentRoutes.get("/check-entry/:entryId", async (c) => {
   }
 });
 
-// 获取网页内容统计
-webContentRoutes.get("/stats", async (c) => {
-  const db = drizzle(c.env.DB);
+// 获取已保存的网页内容
+webContentRoutes.get("/:entryId", async (c) => {
+  const entryId = parseInt(c.req.param('entryId'));
+  
+  if (isNaN(entryId)) {
+    return c.json({ error: "无效的条目ID" }, 400);
+  }
+
+  console.log(`路由层: 开始处理条目 ${entryId} 的请求`);
+  
+  const webContentService = new WebContentService(c.env.DB);
   
   try {
-    // 获取基本的网页内容统计
-    const stats = await db.select({
-        totalEntries: { sql: 'COUNT(*)' },
-        withWebContent: { sql: 'COUNT(CASE WHEN markdown_content IS NOT NULL AND markdown_content != "" THEN 1 END)' },
-        withoutWebContent: { sql: 'COUNT(CASE WHEN markdown_content IS NULL OR markdown_content = "" THEN 1 END)' },
-        avgWordCount: { sql: 'AVG(CASE WHEN word_count > 0 THEN word_count ELSE NULL END)' },
-        maxWordCount: { sql: 'MAX(word_count)' },
-        minWordCount: { sql: 'MIN(word_count)' }
-      })
-      .from(rssEntries)
-      .innerJoin(processedContents, eq(rssEntries.id, processedContents.entryId))
-      .all();
-
+    console.log(`路由层: 调用 WebContentService.getWebContent(${entryId})`);
+    const webContent = await webContentService.getWebContent(entryId);
+    
+    if (!webContent) {
+      console.log(`路由层: WebContentService 返回 null，条目 ${entryId} 的网页内容不存在`);
+      return c.json({ error: "网页内容不存在" }, 404);
+    }
+    
+    console.log(`路由层: 成功获取条目 ${entryId} 的网页内容，长度: ${webContent.content.length}`);
+    
     return c.json({
       success: true,
       data: {
-        stats: stats[0] || {},
-        insights: {
-          contentCoverage: stats[0] ? ((stats[0].withWebContent / stats[0].totalEntries * 100)).toFixed(2) + '%' : '0%',
-          avgContentLength: stats[0] && stats[0].avgWordCount ? Math.round(stats[0].avgWordCount) : 0,
-          contentLengthDistribution: {
-            short: stats[0] && stats[0].totalEntries ? Math.round(stats[0].totalEntries * 0.2) : 0, // 20%
-            medium: stats[0] && stats[0].totalEntries ? Math.round(stats[0].totalEntries * 0.6) : 0, // 60%
-            long: stats[0] && stats[0].totalEntries ? Math.round(stats[0].totalEntries * 0.2) : 0 // 20%
-          }
-        }
+        entryId,
+        ...webContent
       }
     });
   } catch (error) {
-    console.error('获取网页内容统计失败:', error);
+    console.error('路由层: 获取网页内容失败:', error);
     return c.json({ 
-      error: "获取网页内容统计失败", 
+      error: "获取网页内容失败", 
       details: error instanceof Error ? error.message : '未知错误'
     }, 500);
   }

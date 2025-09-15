@@ -1,8 +1,10 @@
 import { Hono } from "hono";
 import { eq } from "drizzle-orm";
+import { drizzle } from "drizzle-orm/d1";
 import { users } from "../db/schema";
 import { initDB } from "../db";
 import { R2Service } from "../services/r2.service";
+import { AccessControlService } from "../services/access-control.service";
 import jwt from "jsonwebtoken";
 
 // 简单的JWT令牌黑名单存储（在生产环境中应使用Redis等外部存储）
@@ -108,6 +110,38 @@ authRoutes.post("/register", async (c) => {
     if (!directoryCreated) {
       // 如果目录创建失败，可以记录日志但不阻止注册流程
       console.warn(`为用户${user.id}创建R2存储目录失败`);
+    }
+
+    // 自动为用户创建R2访问配置
+    try {
+      const db = drizzle(c.env.DB);
+      const accessControlService = new AccessControlService(c.env.DB);
+      
+      // 获取环境配置
+      const r2BucketName = c.env.R2_BUCKET_NAME || 'news-storage';
+      const r2Region = c.env.R2_REGION || 'auto';
+      const r2Endpoint = c.env.R2_ENDPOINT || 'https://your-account.r2.cloudflarestorage.com';
+      
+      // 为用户创建R2访问配置
+      const accessConfig = await accessControlService.createUserAccess(user.id, {
+        bucketName: r2BucketName,
+        region: r2Region,
+        endpoint: r2Endpoint,
+        permissions: [{
+          resource: `user-${user.id}/*`,
+          actions: ['read', 'write', 'list']
+        }],
+        maxStorageBytes: 104857600, // 100MB
+        maxFileCount: 1000,
+        isReadonly: false,
+        expiresInSeconds: 365 * 24 * 60 * 60 // 1年
+      });
+
+      console.log(`为用户 ${user.id} 自动创建R2访问配置成功: ${accessConfig.id}`);
+
+    } catch (accessError) {
+      console.error(`为用户${user.id}创建R2访问配置失败:`, accessError);
+      // 访问配置创建失败不影响注册流程，但记录错误
     }
 
     // 生成JWT令牌实现自动登录

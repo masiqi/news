@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>导航修复验证</title>
+    <script src="https://cdn.jsdelivr.net/npm/amis@6.13.0/sdk/sdk.js"></script>
+</head>
+<body>
+    <h1>导航修复验证测试</h1>
+    <p>请访问 http://localhost:8101 来测试管理后台导航是否已经修复</p>
+    
+    <h2>测试步骤：</h2>
+    <ol>
+        <li>使用 admin/admin123 登录</li>
+        <li>检查左侧菜单是否可以点击</li>
+        <li>点击各个菜单项，查看页面内容是否正确切换</li>
+    </ol>
+    
+    <h2>修复内容：</h2>
+    <ul>
+        <li>将AMIS导航中的 <code>to</code> 属性改为 <code>onClick</code> 事件</li>
+        <li>确保点击菜单项时正确设置 window.location.hash</li>
+        <li>Hash变化事件触发页面重新渲染</li>
+    </ul>
+    
+    <div id="test-result"></div>
+    
+    <script>
+        // 检查管理后台服务状态
+        async function testAdminService() {
+            try {
+                const response = await fetch('http://localhost:8101/');
+                if (response.ok) {
+                    document.getElementById('test-result').innerHTML = 
+                        '<div style="color: green;">✅ 管理后台服务正常运行</div>';
+                } else {
+                    document.getElementById('test-result').innerHTML = 
+                        '<div style="color: red;">❌ 管理后台服务响应异常</div>';
+                }
+            } catch (error) {
+                document.getElementById('test-result').innerHTML = 
+                    '<div style="color: red;">❌ 无法连接到管理后台服务</div>';
+            }
+        }
+        
+        // 页面加载时测试服务
+        window.addEventListener('load', testAdminService);
+    </script>
+</body>
+</html>

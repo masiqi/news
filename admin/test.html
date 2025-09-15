@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>模块化测试页面</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/amis/6.13.0/sdk.min.css" rel="stylesheet"/>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/amis/6.13.0/sdk.js"></script>
+    <script src="components/layout.js"></script>
+    <script src="components/login.js"></script>
+    <script src="components/dashboard.js"></script>
+    <script src="components/user-management.js"></script>
+    <script src="components/rss-management.js"></script>
+</head>
+<body>
+    <div id="root"></div>
+    <script>
+        // 简单测试 - 显示登录页面
+        const schema = getLoginPageConfig();
+        const amisScoped = amis.require('amis/embed').embed("#root", schema);
+        
+        console.log("模块化组件加载测试");
+        console.log("登录页面配置:", schema);
+    </script>
+</body>
+</html>

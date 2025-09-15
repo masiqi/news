@@ -74,6 +74,9 @@ export default function NavigationMenu() {
                 <Link href="/content" className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
                   内容浏览
                 </Link>
+                <Link href="/markdown" className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
+                  Markdown文件
+                </Link>
                 <Link href="/sources/my" className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium">
                   我的源
                 </Link>

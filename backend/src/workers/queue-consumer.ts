@@ -6,6 +6,7 @@ import { QueueConsumerService } from '../services/queue/consumer';
 import { QueueMonitorService } from '../services/queue/monitor';
 import { QueueMessage, ProcessingStatus } from '../services/queue/types';
 import { processingStatuses, messageHistories, queueStats } from '../db/schema';
+import { UnifiedLLMService } from '../services/unified-llm.service';
 
 interface Env {
   DB: D1Database;
@@ -176,29 +177,33 @@ export default {
     
     console.log(`处理AI内容: 源ID ${sourceId}, 内容长度: ${content?.length || 0} 字符`);
     
-    // 使用Cloudflare Workers AI处理内容
-    if (env.AI) {
+    // 使用统一LLM服务处理内容
+    if (env.ZHIPUAI_API_KEY) {
       try {
-        // 生成摘要
-        const summaryResponse = await env.AI.run(
-          '@cf/meta/llama-2-7b-chat-fp16',
-          {
-            prompt: `请为以下内容生成一个简短的摘要:\n\n${content}\n\n摘要:`
-          }
-        );
-        const summary = summaryResponse.response;
+        console.log('使用统一LLM服务进行内容分析...');
         
-        console.log(`AI摘要生成成功: ${summary.length} 字符`);
+        const result = await UnifiedLLMService.analyzeContent({
+          title: `队列处理内容 - 源ID ${sourceId}`,
+          content: content || '',
+          apiKey: env.ZHIPUAI_API_KEY
+        });
+        
+        console.log(`统一LLM分析完成:`);
+        console.log(`   - 主题 (${result.topics.length}个): ${result.topics.join(', ')}`);
+        console.log(`   - 关键词 (${result.keywords.length}个): ${result.keywords.join(', ')}`);
+        console.log(`   - 情感倾向: ${result.sentiment}`);
+        console.log(`   - 分析内容长度: ${result.analysis.length} 字符`);
+        console.log(`   - 处理时间: ${result.processingTime}ms`);
         
         // 这里可以保存处理结果到数据库
         // 由于这是一个示例，我们只记录日志
         
       } catch (aiError) {
-        console.error('AI处理失败:', aiError);
-        throw new Error(`AI处理失败: ${aiError instanceof Error ? aiError.message : '未知错误'}`);
+        console.error('统一LLM处理失败:', aiError);
+        throw new Error(`统一LLM处理失败: ${aiError instanceof Error ? aiError.message : '未知错误'}`);
       }
     } else {
-      console.warn('AI服务未配置，跳过AI处理');
+      console.warn('智谱AI服务未配置，跳过AI处理');
     }
   },
 

@@ -1,5 +1,6 @@
 // src/db/schema.ts
-import { sqliteTable, text, integer, index, uniqueIndex } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer, real, index, uniqueIndex } from 'drizzle-orm/sqlite-core';
+import { sql } from 'drizzle-orm';
 
 // 用户表
 export const users = sqliteTable('users', {
@@ -591,6 +592,66 @@ export const userSettings = sqliteTable('user_settings', {
   createdAtIdx: index('idx_user_settings_created_at').on(table.createdAt),
 }));
 
+// 用户自动存储配置表
+export const userAutoStorageConfigs = sqliteTable('user_auto_storage_configs', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  userId: integer('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }).unique(),
+  enabled: integer('enabled', { mode: 'boolean' }).default(true).notNull(),
+  storagePath: text('storage_path').notNull().default('notes'),
+  filenamePattern: text('filename_pattern').notNull().default('{title}_{id}_{date}'),
+  maxFileSize: integer('max_file_size').notNull().default(1048576), // 1MB
+  maxFilesPerDay: integer('max_files_per_day').notNull().default(100),
+  includeMetadata: integer('include_metadata', { mode: 'boolean' }).default(true).notNull(),
+  fileFormat: text('file_format').notNull().default('standard').$type<'standard' | 'academic' | 'concise'>(),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().default(sql`CURRENT_TIMESTAMP`),
+}, (table) => ({
+  // 索引定义
+  userIdIdx: uniqueIndex('unq_user_auto_storage_configs_user_id').on(table.userId),
+  enabledIdx: index('idx_user_auto_storage_configs_enabled').on(table.enabled),
+  fileFormatIdx: index('idx_user_auto_storage_configs_file_format').on(table.fileFormat),
+  createdAtIdx: index('idx_user_auto_storage_configs_created_at').on(table.createdAt),
+}));
+
+// 用户存储日志表
+export const userStorageLogs = sqliteTable('user_storage_logs', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  userId: integer('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  sourceId: integer('source_id').notNull().references(() => sources.id, { onDelete: 'cascade' }),
+  entryId: integer('entry_id').notNull().references(() => rssEntries.id, { onDelete: 'cascade' }),
+  filePath: text('file_path').notNull(),
+  fileSize: integer('file_size').notNull(),
+  status: text('status').notNull().$type<'success' | 'failed'>(),
+  errorMessage: text('error_message'),
+  processingTime: integer('processing_time').notNull(), // 处理时间（毫秒）
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`CURRENT_TIMESTAMP`),
+}, (table) => ({
+  // 索引定义
+  userIdIdx: index('idx_user_storage_logs_user_id').on(table.userId),
+  sourceIdIdx: index('idx_user_storage_logs_source_id').on(table.sourceId),
+  entryIdIdx: index('idx_user_storage_logs_entry_id').on(table.entryId),
+  statusIdx: index('idx_user_storage_logs_status').on(table.status),
+  createdAtIdx: index('idx_user_storage_logs_created_at').on(table.createdAt),
+}));
+
+// 用户存储统计表
+export const userStorageStats = sqliteTable('user_storage_stats', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  userId: integer('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }).unique(),
+  totalFiles: integer('total_files').notNull().default(0),
+  totalSize: integer('total_size').notNull().default(0), // 总大小（字节）
+  todayFiles: integer('today_files').notNull().default(0),
+  todaySize: integer('today_size').notNull().default(0),
+  lastStorageAt: integer('last_storage_at', { mode: 'timestamp' }),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().default(sql`CURRENT_TIMESTAMP`),
+}, (table) => ({
+  // 索引定义
+  userIdIdx: uniqueIndex('unq_user_storage_stats_user_id').on(table.userId),
+  createdAtIdx: index('idx_user_storage_stats_created_at').on(table.createdAt),
+  updatedAtIdx: index('idx_user_storage_stats_updated_at').on(table.updatedAt),
+}));
+
 // ================ 监控系统相关表 ================
 
 // 系统性能指标表
@@ -868,4 +929,616 @@ export const systemEventLogs = sqliteTable('system_event_logs', {
   userIdIdx: index('idx_system_event_logs_user_id').on(table.userId),
   createdAtIdx: index('idx_system_event_logs_created_at').on(table.createdAt),
 }));
+
+// ================ 多用户R2访问控制相关表 ================
+
+// 用户R2访问配置表（更详细的访问控制）
+export const userR2Access = sqliteTable('user_r2_access', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  userId: integer('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  accessKeyId: text('access_key_id').notNull().unique(),
+  secretAccessKeyHash: text('secret_access_key_hash').notNull(), // 加密存储
+  pathPrefix: text('path_prefix').notNull(), // 用户专属路径前缀，如 "user-123/"
+  bucketName: text('bucket_name').notNull(),
+  region: text('region').notNull().default('auto'),
+  endpoint: text('endpoint').notNull(),
+  permissionsJson: text('permissions_json').notNull().default('{"read": true, "write": false, "delete": false, "list": true}'), // JSON格式存储权限
+  isActive: integer('is_active', { mode: 'boolean' }).default(true).notNull(),
+  maxStorageBytes: integer('max_storage_bytes').notNull().default(104857600), // 100MB
+  currentStorageBytes: integer('current_storage_bytes').notNull().default(0),
+  maxFileCount: integer('max_file_count').notNull().default(1000),
+  currentFileCount: integer('current_file_count').notNull().default(0),
+  isReadonly: integer('is_readonly', { mode: 'boolean' }).default(true).notNull(),
+  expiresAt: integer('expires_at', { mode: 'timestamp' }),
+  lastUsedAt: integer('last_used_at', { mode: 'timestamp' }),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
+}, (table) => ({
+  // 索引定义
+  userIdIdx: uniqueIndex('unq_user_r2_access_user_id').on(table.userId),
+  accessKeyIdIdx: uniqueIndex('unq_user_r2_access_access_key_id').on(table.accessKeyId),
+  isActiveIdx: index('idx_user_r2_access_is_active').on(table.isActive),
+  pathPrefixIdx: index('idx_user_r2_access_path_prefix').on(table.pathPrefix),
+  createdAtIdx: index('idx_user_r2_access_created_at').on(table.createdAt),
+  expiresAtIdx: index('idx_user_r2_access_expires_at').on(table.expiresAt),
+}));
+
+// 访问权限表（细粒度权限控制）
+export const r2Permissions = sqliteTable('r2_permissions', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  accessId: integer('access_id').notNull().references(() => userR2Access.id, { onDelete: 'cascade' }),
+  resourcePattern: text('resource_pattern').notNull(), // 资源路径模式，如 'user-123/news/*'
+  actions: text('actions').notNull(), // JSON数组，如 '["read", "write"]'
+  conditions: text('conditions'), // JSON格式的条件
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
+}, (table) => ({
+  // 索引定义
+  accessIdIdx: index('idx_r2_permissions_access_id').on(table.accessId),
+  resourcePatternIdx: index('idx_r2_permissions_resource_pattern').on(table.resourcePattern),
+  createdAtIdx: index('idx_r2_permissions_created_at').on(table.createdAt),
+}));
+
+// 访问控制日志表
+export const r2AccessLogs = sqliteTable('r2_access_logs', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  userId: integer('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  accessId: integer('access_id').notNull().references(() => userR2Access.id, { onDelete: 'cascade' }),
+  operation: text('operation').notNull().$type<'read' | 'write' | 'delete' | 'list' | 'head'>(),
+  resourcePath: text('resource_path').notNull(),
+  resourceSize: integer('resource_size'),
+  statusCode: integer('status_code').notNull(),
+  responseTime: integer('response_time').notNull(), // 毫秒
+  bytesTransferred: integer('bytes_transferred').default(0),
+  ipAddress: text('ip_address').notNull(),
+  userAgent: text('user_agent'),
+  requestHeaders: text('request_headers'), // JSON格式
+  responseHeaders: text('response_headers'), // JSON格式
+  errorMessage: text('error_message'),
+  timestamp: integer('timestamp', { mode: 'timestamp' }).notNull(),
+}, (table) => ({
+  // 索引定义
+  userIdIdx: index('idx_r2_access_logs_user_id').on(table.userId),
+  accessIdIdx: index('idx_r2_access_logs_access_id').on(table.accessId),
+  operationIdx: index('idx_r2_access_logs_operation').on(table.operation),
+  timestampIdx: index('idx_r2_access_logs_timestamp').on(table.timestamp),
+  statusCodeIdx: index('idx_r2_access_logs_status_code').on(table.statusCode),
+}));
+
+// 用户目录配额表
+export const userDirectoryQuotas = sqliteTable('user_directory_quotas', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  userId: integer('user_id').notNull().unique().references(() => users.id, { onDelete: 'cascade' }),
+  maxStorageBytes: integer('max_storage_bytes').notNull().default(104857600), // 100MB
+  maxFileCount: integer('max_file_count').notNull().default(1000),
+  currentStorageBytes: integer('current_storage_bytes').notNull().default(0),
+  currentFileCount: integer('current_file_count').notNull().default(0),
+  lastUpdated: integer('last_updated', { mode: 'timestamp' }).notNull(),
+}, (table) => ({
+  // 索引定义
+  userIdIdx: uniqueIndex('unq_user_directory_quotas_user_id').on(table.userId),
+  storageBytesIdx: index('idx_user_directory_quotas_storage_bytes').on(table.currentStorageBytes),
+  fileCountIdx: index('idx_user_directory_quotas_file_count').on(table.currentFileCount),
+  lastUpdatedIdx: index('idx_user_directory_quotas_last_updated').on(table.lastUpdated),
+}));
+
+// 访问令牌表（用于Worker代理）
+export const accessTokens = sqliteTable('access_tokens', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  userId: integer('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  accessId: integer('access_id').notNull().references(() => userR2Access.id, { onDelete: 'cascade' }),
+  tokenHash: text('token_hash').notNull().unique(),
+  tokenType: text('token_type').notNull().default('bearer').$type<'bearer' | 'api_key'>(),
+  scope: text('scope').notNull().default('r2:read'), // 令牌作用域
+  expiresAt: integer('expires_at', { mode: 'timestamp' }),
+  isRevoked: integer('is_revoked', { mode: 'boolean' }).default(false).notNull(),
+  lastUsedAt: integer('last_used_at', { mode: 'timestamp' }),
+  usageCount: integer('usage_count').notNull().default(0),
+  ipWhitelist: text('ip_whitelist'), // JSON格式的IP白名单
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
+}, (table) => ({
+  // 索引定义
+  userIdIdx: index('idx_access_tokens_user_id').on(table.userId),
+  accessIdIdx: index('idx_access_tokens_access_id').on(table.accessId),
+  tokenHashIdx: uniqueIndex('unq_access_tokens_token_hash').on(table.tokenHash),
+  expiresAtIdx: index('idx_access_tokens_expires_at').on(table.expiresAt),
+  isRevokedIdx: index('idx_access_tokens_is_revoked').on(table.isRevoked),
+  createdAtIdx: index('idx_access_tokens_created_at').on(table.createdAt),
+}));
+
+// R2操作审计表
+export const r2AuditLogs = sqliteTable('r2_audit_logs', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  userId: integer('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  accessId: integer('access_id').notNull().references(() => userR2Access.id, { onDelete: 'cascade' }),
+  sessionId: text('session_id'), // 会话标识
+  operation: text('operation').notNull(),
+  details: text('details'), // JSON格式的详细信息
+  riskLevel: text('risk_level').notNull().default('low').$type<'low' | 'medium' | 'high'>(),
+  isSuspicious: integer('is_suspicious', { mode: 'boolean' }).default(false).notNull(),
+  flaggedForReview: integer('flagged_for_review', { mode: 'boolean' }).default(false).notNull(),
+  timestamp: integer('timestamp', { mode: 'timestamp' }).notNull(),
+}, (table) => ({
+  // 索引定义
+  userIdIdx: index('idx_r2_audit_logs_user_id').on(table.userId),
+  operationIdx: index('idx_r2_audit_logs_operation').on(table.operation),
+  riskLevelIdx: index('idx_r2_audit_logs_risk_level').on(table.riskLevel),
+  timestampIdx: index('idx_r2_audit_logs_timestamp').on(table.timestamp),
+  isSuspiciousIdx: index('idx_r2_audit_logs_is_suspicious').on(table.isSuspicious),
+}));
+
+// ============= Obsidian智能关联与内容优化相关表 =============
+
+// 增强内容分析表
+export const enhancedContentAnalysis = sqliteTable('enhanced_content_analysis', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  userId: integer('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  contentId: integer('content_id').notNull().references(() => processedContent.id, { onDelete: 'cascade' }),
+  sourceId: text('source_id').notNull(),
+  
+  // 基础内容信息
+  title: text('title').notNull(),
+  content: text('content').notNull(),
+  summary: text('summary'),
+  
+  // 主题和标签分析（JSON格式）
+  topics: text('topics'), // JSON格式存储主题数组
+  keywords: text('keywords'), // JSON格式存储关键词数组
+  categories: text('categories'), // JSON格式存储分类数组
+  tags: text('tags'), // JSON格式存储标签数组
+  
+  // 情感和重要性分析
+  sentimentScore: real('sentiment_score').default(0), // 情感分数 (-1到1)
+  sentimentLabel: text('sentiment_label'), // 情感标签 (positive, negative, neutral)
+  importanceScore: real('importance_score').default(0), // 重要性分数 (0到1)
+  readabilityScore: real('readability_score').default(0), // 可读性分数 (0到1)
+  
+  // 内容向量（用于相似度计算）
+  contentVector: text('content_vector'), // JSON格式存储向量数组
+  embeddingModel: text('embedding_model').default('text-embedding-ada-002'),
+  
+  // 时间上下文（JSON格式）
+  temporalContext: text('temporal_context'), // JSON格式存储时间上下文
+  timelinePosition: text('timeline_position').default('established'), // breaking, developing, established
+  
+  // 处理信息
+  aiModel: text('ai_model').notNull(),
+  processingTime: integer('processing_time').default(0), // 处理时间（毫秒）
+  processedAt: integer('processed_at', { mode: 'timestamp' }).default(new Date()),
+}, (table) => ({
+  // 索引定义
+  userIdIdx: index('idx_enhanced_content_user_id').on(table.userId),
+  contentIdIdx: index('idx_enhanced_content_content_id').on(table.contentId),
+  sentimentIdx: index('idx_enhanced_content_sentiment').on(table.sentimentScore),
+  importanceIdx: index('idx_enhanced_content_importance').on(table.importanceScore),
+  processedAtIdx: index('idx_enhanced_content_processed_at').on(table.processedAt),
+}));
+
+// 主题表（用于知识图谱）
+export const topics = sqliteTable('topics', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  name: text('name').notNull().unique(),
+  displayName: text('display_name').notNull(),
+  description: text('description'),
+  category: text('category').default('general'), // technology, business, science, etc.
+  parentTopicId: integer('parent_topic_id').references(() => topics.id), // 父主题ID，支持层级结构
+  isTrending: integer('is_trending', { mode: 'boolean' }).default(false),
+  trendScore: real('trend_score').default(0),
+  createdAt: integer('created_at', { mode: 'timestamp' }).default(new Date()),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).default(new Date()),
+}, (table) => ({
+  // 索引定义
+  nameIdx: index('idx_topics_name').on(table.name),
+  categoryIdx: index('idx_topics_category').on(table.category),
+  trendingIdx: index('idx_topics_trending').on(table.isTrending, table.trendScore),
+  parentIdx: index('idx_topics_parent').on(table.parentTopicId),
+}));
+
+// 内容主题关联表
+export const contentTopics = sqliteTable('content_topics', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  contentAnalysisId: integer('content_analysis_id').notNull().references(() => enhancedContentAnalysis.id, { onDelete: 'cascade' }),
+  topicId: integer('topic_id').notNull().references(() => topics.id, { onDelete: 'cascade' }),
+  confidence: real('confidence').notNull(), // 置信度 (0到1)
+  relevanceScore: real('relevance_score').default(0), // 相关性分数
+  isPrimary: integer('is_primary', { mode: 'boolean' }).default(false), // 是否为主要主题
+}, (table) => ({
+  // 索引定义
+  analysisIdx: index('idx_content_topics_analysis').on(table.contentAnalysisId),
+  topicIdx: index('idx_content_topics_topic').on(table.topicId),
+  confidenceIdx: index('idx_content_topics_confidence').on(table.confidence),
+  // 唯一约束
+  uniqueAnalysisTopic: uniqueIndex('unq_content_topics_analysis_topic').on(table.contentAnalysisId, table.topicId),
+}));
+
+// 关键词表
+export const keywords = sqliteTable('keywords', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  text: text('text').notNull().unique(),
+  normalizedText: text('normalized_text').notNull().unique(), // 标准化后的文本
+  isEntity: integer('is_entity', { mode: 'boolean' }).default(false),
+  entityType: text('entity_type'), // PERSON, ORGANIZATION, LOCATION, etc.
+  frequency: integer('frequency').default(0),
+  createdAt: integer('created_at', { mode: 'timestamp' }).default(new Date()),
+}, (table) => ({
+  // 索引定义
+  textIdx: index('idx_keywords_text').on(table.text),
+  normalizedIdx: index('idx_keywords_normalized').on(table.normalizedText),
+  entityIdx: index('idx_keywords_entity').on(table.isEntity, table.entityType),
+  frequencyIdx: index('idx_keywords_frequency').on(table.frequency),
+}));
+
+// 内容关键词关联表
+export const contentKeywords = sqliteTable('content_keywords', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  contentAnalysisId: integer('content_analysis_id').notNull().references(() => enhancedContentAnalysis.id, { onDelete: 'cascade' }),
+  keywordId: integer('keyword_id').notNull().references(() => keywords.id, { onDelete: 'cascade' }),
+  weight: real('weight').notNull(), // 权重 (0到1)
+  context: text('context'), // 上下文信息
+  positionInContent: integer('position_in_content'), // 在内容中的位置
+  isSignificant: integer('is_significant', { mode: 'boolean' }).default(false), // 是否为重要关键词
+}, (table) => ({
+  // 索引定义
+  analysisIdx: index('idx_content_keywords_analysis').on(table.contentAnalysisId),
+  keywordIdx: index('idx_content_keywords_keyword').on(table.keywordId),
+  weightIdx: index('idx_content_keywords_weight').on(table.weight),
+  // 唯一约束
+  uniqueAnalysisKeyword: uniqueIndex('unq_content_keywords_analysis_keyword').on(table.contentAnalysisId, table.keywordId),
+}));
+
+// 内容关联表（用于智能链接）
+export const contentRelations = sqliteTable('content_relations', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  sourceContentId: integer('source_content_id').notNull().references(() => enhancedContentAnalysis.id, { onDelete: 'cascade' }),
+  targetContentId: integer('target_content_id').notNull().references(() => enhancedContentAnalysis.id, { onDelete: 'cascade' }),
+  relationType: text('relation_type').notNull(), // semantic, temporal, topical, source
+  similarityScore: real('similarity_score').notNull(), // 相似度分数 (0到1)
+  relationStrength: real('relation_strength').default(0), // 关联强度
+  relationReason: text('relation_reason'), // 关联原因说明
+  
+  // 时间关联信息
+  timeRelation: text('time_relation'), // before, after, contemporary
+  timeInterval: text('time_interval'), // 时间间隔描述
+  
+  // 创建和更新时间
+  createdAt: integer('created_at', { mode: 'timestamp' }).default(new Date()),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).default(new Date()),
+}, (table) => ({
+  // 索引定义
+  sourceIdx: index('idx_content_relations_source').on(table.sourceContentId),
+  targetIdx: index('idx_content_relations_target').on(table.targetContentId),
+  typeIdx: index('idx_content_relations_type').on(table.relationType),
+  similarityIdx: index('idx_content_relations_similarity').on(table.similarityScore),
+  createdIdx: index('idx_content_relations_created').on(table.createdAt),
+  // 唯一约束（避免重复关联）
+  uniqueSourceTargetType: uniqueIndex('unq_content_relations_source_target_type').on(table.sourceContentId, table.targetContentId, table.relationType),
+}));
+
+// Obsidian模板表
+export const obsidianTemplates = sqliteTable('obsidian_templates', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  name: text('name').notNull().unique(),
+  description: text('description'),
+  templateContent: text('template_content').notNull(), // 模板内容（支持变量替换）
+  
+  // 模板配置
+  templateType: text('template_type').default('article'), // article, summary, analysis
+  yamlFrontmatterConfig: text('yaml_frontmatter_config'), // JSON格式的YAML frontmatter配置
+  
+  // 链接策略
+  linkStrategies: text('link_strategies'), // JSON格式的链接策略配置
+  maxLinks: integer('max_links').default(10),
+  
+  // 支持的样式（JSON数组格式）
+  supportedStyles: text('supported_styles'),
+  
+  // 模板属性
+  isDefault: integer('is_default', { mode: 'boolean' }).default(false),
+  isActive: integer('is_active', { mode: 'boolean' }).default(true),
+  version: text('version').default('1.0'),
+  
+  // 创建和更新时间
+  createdAt: integer('created_at', { mode: 'timestamp' }).default(new Date()),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).default(new Date()),
+  
+  // 作者信息
+  createdBy: integer('created_by').references(() => users.id),
+}, (table) => ({
+  // 索引定义
+  nameIdx: index('idx_obsidian_templates_name').on(table.name),
+  typeIdx: index('idx_obsidian_templates_type').on(table.templateType),
+  activeIdx: index('idx_obsidian_templates_active').on(table.isActive),
+  defaultIdx: index('idx_obsidian_templates_default').on(table.isDefault),
+}));
+
+// 用户模板偏好表
+export const userTemplatePreferences = sqliteTable('user_template_preferences', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  userId: integer('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  templateId: integer('template_id').notNull().references(() => obsidianTemplates.id, { onDelete: 'cascade' }),
+  preferenceOrder: integer('preference_order').default(0), // 偏好顺序
+  
+  // 自定义配置（JSON格式）
+  customConfig: text('custom_config'),
+  
+  // 使用统计
+  usageCount: integer('usage_count').default(0),
+  lastUsedAt: integer('last_used_at', { mode: 'timestamp' }),
+  
+  // 创建时间
+  createdAt: integer('created_at', { mode: 'timestamp' }).default(new Date()),
+}, (table) => ({
+  // 索引定义
+  userIdx: index('idx_user_template_prefs_user').on(table.userId),
+  templateIdx: index('idx_user_template_prefs_template').on(table.templateId),
+  orderIdx: index('idx_user_template_prefs_order').on(table.preferenceOrder),
+  // 唯一约束
+  uniqueUserTemplate: uniqueIndex('unq_user_template_prefs_user_template').on(table.userId, table.templateId),
+}));
+
+// 知识图谱节点表
+export const knowledgeGraphNodes = sqliteTable('knowledge_graph_nodes', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  userId: integer('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  nodeType: text('node_type').notNull(), // content, topic, keyword, tag
+  nodeId: text('node_id').notNull(), // 对应内容ID、主题ID等
+  label: text('label').notNull(),
+  
+  // 节点属性（JSON格式）
+  properties: text('properties'),
+  
+  // 可视化信息
+  xPosition: real('x_position'), // 用于布局的X坐标
+  yPosition: real('y_position'), // 用于布局的Y坐标
+  nodeSize: real('node_size').default(1), // 节点大小
+  nodeColor: text('node_color'), // 节点颜色
+  
+  // 统计信息
+  connectionCount: integer('connection_count').default(0),
+  importanceScore: real('importance_score').default(0),
+  
+  // 时间信息
+  createdAt: integer('created_at', { mode: 'timestamp' }).default(new Date()),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).default(new Date()),
+}, (table) => ({
+  // 索引定义
+  userIdx: index('idx_knowledge_nodes_user').on(table.userId),
+  typeIdx: index('idx_knowledge_nodes_type').on(table.nodeType),
+  importanceIdx: index('idx_knowledge_nodes_importance').on(table.importanceScore),
+  connectionsIdx: index('idx_knowledge_nodes_connections').on(table.connectionCount),
+  // 唯一约束
+  uniqueUserNodeType: uniqueIndex('unq_knowledge_nodes_user_node_type').on(table.userId, table.nodeType, table.nodeId),
+}));
+
+// 知识图谱边表
+export const knowledgeGraphEdges = sqliteTable('knowledge_graph_edges', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  userId: integer('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  sourceNodeId: integer('source_node_id').notNull().references(() => knowledgeGraphNodes.id, { onDelete: 'cascade' }),
+  targetNodeId: integer('target_node_id').notNull().references(() => knowledgeGraphNodes.id, { onDelete: 'cascade' }),
+  edgeType: text('edge_type').notNull(), // relates_to, similar_to, references, etc.
+  weight: real('weight').default(1), // 边权重
+  properties: text('properties'), // JSON格式的边属性
+  
+  // 时间信息
+  createdAt: integer('created_at', { mode: 'timestamp' }).default(new Date()),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).default(new Date()),
+}, (table) => ({
+  // 索引定义
+  userIdx: index('idx_knowledge_edges_user').on(table.userId),
+  sourceIdx: index('idx_knowledge_edges_source').on(table.sourceNodeId),
+  targetIdx: index('idx_knowledge_edges_target').on(table.targetNodeId),
+  typeIdx: index('idx_knowledge_edges_type').on(table.edgeType),
+  weightIdx: index('idx_knowledge_edges_weight').on(table.weight),
+}));
+
+// 智能链接生成日志表
+export const smartLinkGenerationLogs = sqliteTable('smart_link_generation_logs', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  userId: integer('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  contentAnalysisId: integer('content_analysis_id').notNull().references(() => enhancedContentAnalysis.id, { onDelete: 'cascade' }),
+  
+  // 生成统计
+  totalLinksGenerated: integer('total_links_generated').default(0),
+  tagLinksCount: integer('tag_links_count').default(0),
+  topicLinksCount: integer('topic_links_count').default(0),
+  similarityLinksCount: integer('similarity_links_count').default(0),
+  temporalLinksCount: integer('temporal_links_count').default(0),
+  
+  // 生成配置（JSON格式）
+  generationConfig: text('generation_config'),
+  
+  // 性能指标
+  generationTime: integer('generation_time').default(0), // 生成时间（毫秒）
+  
+  // 结果质量
+  averageLinkQuality: real('average_link_quality').default(0), // 平均链接质量分数
+  
+  // 时间信息
+  createdAt: integer('created_at', { mode: 'timestamp' }).default(new Date()),
+}, (table) => ({
+  // 索引定义
+  userIdx: index('idx_smart_link_logs_user').on(table.userId),
+  contentIdx: index('idx_smart_link_logs_content').on(table.contentAnalysisId),
+  createdIdx: index('idx_smart_link_logs_created').on(table.createdAt),
+}));
+
+// Export all table types for use in other modules
+export type {
+  users as Users,
+  sources as Sources,
+  processedContents as ProcessedContent,
+  userR2Access as UserR2Access,
+  userDirectoryQuotas as UserDirectoryQuotas,
+  enhancedContentAnalysis as EnhancedContentAnalysis,
+  topics as Topics,
+  contentTopics as ContentTopics,
+  keywords as Keywords,
+  contentKeywords as ContentKeywords,
+  contentRelations as ContentRelations,
+  obsidianTemplates as ObsidianTemplates,
+  userTemplatePreferences as UserTemplatePreferences,
+  knowledgeGraphNodes as KnowledgeGraphNodes,
+  knowledgeGraphEdges as KnowledgeGraphEdges,
+  smartLinkGenerationLogs as SmartLinkGenerationLogs,
+  userAutoStorageConfigs as UserAutoStorageConfigs,
+  userStorageLogs as UserStorageLogs,
+  userStorageStats as UserStorageStats,
+};
+
+// GLM API集成相关表
+export const glmConfigs = sqliteTable('glm_configs', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  userId: integer('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  name: text('name').notNull(),
+  apiKey: text('api_key').notNull(),
+  baseUrl: text('base_url').notNull().default('https://open.bigmodel.cn/api/paas/v4'),
+  model: text('model').notNull().default('glm-4'),
+  maxTokens: integer('max_tokens').notNull().default(2000),
+  temperature: real('temperature').notNull().default(0.7),
+  timeout: integer('timeout').notNull().default(30000),
+  maxRetries: integer('max_retries').notNull().default(3),
+  isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true),
+  maxConcurrency: integer('max_concurrency').notNull().default(1),
+  dailyLimit: integer('daily_limit'),
+  monthlyLimit: integer('monthly_limit').default(3000),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().default(sql`CURRENT_TIMESTAMP`),
+}, (table) => ({
+  userIdIdx: index('idx_glm_configs_user_id').on(table.userId),
+  activeIdx: index('idx_glm_configs_active').on(table.isActive),
+}));
+
+export const glmUsageStats = sqliteTable('glm_usage_stats', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  userId: integer('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  configId: integer('config_id').notNull().references(() => glmConfigs.id, { onDelete: 'cascade' }),
+  date: text('date').notNull(), // YYYY-MM-DD格式
+  totalCalls: integer('total_calls').notNull().default(0),
+  successfulCalls: integer('successful_calls').notNull().default(0),
+  failedCalls: integer('failed_calls').notNull().default(0),
+  totalTokens: integer('total_tokens').notNull().default(0),
+  totalCost: real('total_cost').notNull().default(0),
+  averageResponseTime: real('average_response_time').notNull().default(0),
+  model: text('model').notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().default(sql`CURRENT_TIMESTAMP`),
+}, (table) => ({
+  userDateIdx: uniqueIndex('idx_glm_usage_stats_user_date').on(table.userId, table.configId, table.date),
+  configDateIdx: index('idx_glm_usage_stats_config_date').on(table.configId, table.date),
+}));
+
+export const glmRequestQueue = sqliteTable('glm_request_queue', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  userId: integer('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  configId: integer('config_id').notNull().references(() => glmConfigs.id, { onDelete: 'cascade' }),
+  contentId: text('content_id'),
+  requestId: text('request_id').notNull().unique(),
+  prompt: text('prompt').notNull(),
+  model: text('model').notNull(),
+  priority: integer('priority').notNull().default(0),
+  status: text('status').notNull().default('pending').$type<'pending' | 'processing' | 'completed' | 'failed' | 'cancelled'>(),
+  retryCount: integer('retry_count').notNull().default(0),
+  maxRetries: integer('max_retries').notNull().default(3),
+  nextRetryAt: integer('next_retry_at', { mode: 'timestamp' }),
+  errorMessage: text('error_message'),
+  resultData: text('result_data'), // JSON格式存储GLM响应
+  estimatedTokens: integer('estimated_tokens'),
+  actualTokens: integer('actual_tokens'),
+  cost: real('cost'),
+  responseTime: integer('response_time'), // 毫秒
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`CURRENT_TIMESTAMP`),
+  processedAt: integer('processed_at', { mode: 'timestamp' }),
+}, (table) => ({
+  userIdIdx: index('idx_glm_request_queue_user_id').on(table.userId),
+  statusIdx: index('idx_glm_request_queue_status').on(table.status),
+  priorityIdx: index('idx_glm_request_queue_priority').on(table.priority, table.createdAt),
+  requestIdIdx: index('idx_glm_request_queue_request_id').on(table.requestId),
+  nextRetryIdx: index('idx_glm_request_queue_next_retry').on(table.nextRetryAt),
+}));
+
+export const glmCallLogs = sqliteTable('glm_call_logs', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  userId: integer('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  configId: integer('config_id').notNull().references(() => glmConfigs.id, { onDelete: 'cascade' }),
+  requestId: text('request_id').notNull(),
+  endpoint: text('endpoint').notNull(),
+  model: text('model').notNull(),
+  requestPrompt: text('request_prompt').notNull(),
+  requestParameters: text('request_parameters'), // JSON格式
+  responseSuccess: integer('response_success', { mode: 'boolean' }).notNull(),
+  responseData: text('response_data'), // JSON格式
+  responseError: text('response_error'),
+  statusCode: integer('status_code'),
+  responseTime: integer('response_time').notNull(), // 毫秒
+  tokensUsed: integer('tokens_used').notNull().default(0),
+  promptTokens: integer('prompt_tokens').default(0),
+  completionTokens: integer('completion_tokens').default(0),
+  cost: real('cost').notNull().default(0),
+  retryCount: integer('retry_count').notNull().default(0),
+  errorType: text('error_type'),
+  errorDetails: text('error_details'), // JSON格式
+  timestamp: integer('timestamp', { mode: 'timestamp' }).notNull().default(sql`CURRENT_TIMESTAMP`),
+}, (table) => ({
+  userIdIdx: index('idx_glm_call_logs_user_id').on(table.userId),
+  timestampIdx: index('idx_glm_call_logs_timestamp').on(table.timestamp),
+  requestIdIdx: index('idx_glm_call_logs_request_id').on(table.requestId),
+}));
+
+export const glmMonitoring = sqliteTable('glm_monitoring', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  userId: integer('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  configId: integer('config_id').notNull().references(() => glmConfigs.id, { onDelete: 'cascade' }),
+  metricType: text('metric_type').notNull().$type<'concurrency' | 'queue_length' | 'error_rate' | 'response_time'>(),
+  metricValue: real('metric_value').notNull(),
+  timestamp: integer('timestamp', { mode: 'timestamp' }).notNull().default(sql`CURRENT_TIMESTAMP`),
+  additionalData: text('additional_data'), // JSON格式存储额外信息
+}, (table) => ({
+  userMetricIdx: index('idx_glm_monitoring_user_metric').on(table.userId, table.metricType),
+  timestampIdx: index('idx_glm_monitoring_timestamp').on(table.timestamp),
+}));
+
+// Export GLM types
+export type GLMConfig = typeof glmConfigs.$inferSelect;
+export type GLMUsageStats = typeof glmUsageStats.$inferSelect;
+export type GLMRequestQueue = typeof glmRequestQueue.$inferSelect;
+export type GLMCallLogs = typeof glmCallLogs.$inferSelect;
+export type GLMMonitoring = typeof glmMonitoring.$inferSelect;
+
+export const glmSchema = {
+  glmConfigs,
+  glmUsageStats,
+  glmRequestQueue,
+  glmCallLogs,
+  glmMonitoring,
+};
+
+// Export all table references for database operations
+export const schema = {
+  users,
+  sources,
+  processedContents,
+  userR2Access,
+  userDirectoryQuotas,
+  enhancedContentAnalysis,
+  topics,
+  contentTopics,
+  keywords,
+  contentKeywords,
+  contentRelations,
+  obsidianTemplates,
+  userTemplatePreferences,
+  knowledgeGraphNodes,
+  knowledgeGraphEdges,
+  smartLinkGenerationLogs,
+  userAutoStorageConfigs,
+  userStorageLogs,
+  userStorageStats,
+  glmConfigs,
+  glmUsageStats,
+  glmRequestQueue,
+  glmCallLogs,
+  glmMonitoring,
+};
 

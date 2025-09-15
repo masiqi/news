@@ -4,7 +4,7 @@ import { TopicExtractionService } from "../services/topic-extraction.service";
 import { ModelConfigService, TopicExtractionModelConfig } from "../services/model-config.service";
 import { drizzle } from 'drizzle-orm/d1';
 import { rssEntries, processedContents } from '../db/schema';
-import { eq, and, isNull } from 'drizzle-orm';
+import { eq, and, isNull, sql } from 'drizzle-orm';
 
 const topicsRoutes = new Hono<{ Bindings: CloudflareBindings }>();
 
@@ -26,6 +26,98 @@ topicsRoutes.get("/models", async (c) => {
     console.error('获取模型列表失败:', error);
     return c.json({ 
       error: "获取模型列表失败", 
+      details: error instanceof Error ? error.message : '未知错误'
+    }, 500);
+  }
+});
+
+// 获取主题统计信息
+topicsRoutes.get("/stats", async (c) => {
+  const db = drizzle(c.env.DB);
+  
+  try {
+    // 获取主题统计
+    const stats = await db.select({
+        entryCount: sql`COUNT(*)`,
+        withTopicsCount: sql`COUNT(CASE WHEN topics IS NOT NULL AND topics != '[]' THEN 1 END)`,
+        withoutTopicsCount: sql`COUNT(CASE WHEN topics IS NULL OR topics = '[]' THEN 1 END)`,
+        avgProcessingTime: sql`AVG(processing_time)`
+      })
+      .from(processedContents)
+      .all();
+
+    // 获取最热门的主题
+    // 注意：SQLite 中可能需要使用不同的JSON语法
+    const popularTopics = await db.select({
+        topic: processedContents.topics,
+        count: sql`COUNT(*)`
+      })
+      .from(processedContents)
+      .where(sql`topics IS NOT NULL AND topics != '[]'`)
+      .groupBy(sql`topics`)
+      .orderBy(sql`COUNT(*) DESC`)
+      .limit(10)
+      .all();
+
+    // 按模型统计
+    const modelStats = await db.select({
+        modelUsed: processedContents.modelUsed,
+        count: sql`COUNT(*)`,
+        avgProcessingTime: sql`AVG(processing_time)`
+      })
+      .from(processedContents)
+      .where(sql`model_used IS NOT NULL`)
+      .groupBy(sql`model_used`)
+      .orderBy(sql`COUNT(*) DESC`)
+      .all();
+
+    return c.json({
+      success: true,
+      data: {
+        stats: stats[0] || {},
+        popularTopics,
+        modelStats
+      }
+    });
+  } catch (error) {
+    console.error('获取主题统计失败:', error);
+    return c.json({ 
+      error: "获取主题统计失败", 
+      details: error instanceof Error ? error.message : '未知错误'
+    }, 500);
+  }
+});
+
+// 获取热门主题
+topicsRoutes.get("/popular", async (c) => {
+  const db = drizzle(c.env.DB);
+  const limit = parseInt(c.req.query('limit')) || 10;
+  
+  try {
+    // 获取最热门的主题
+    const popularTopics = await db.select({
+        topic: processedContents.topics,
+        count: sql`COUNT(*)`
+      })
+      .from(processedContents)
+      .where(sql`topics IS NOT NULL AND topics != '[]'`)
+      .groupBy(sql`topics`)
+      .orderBy(sql`COUNT(*) DESC`)
+      .limit(limit)
+      .all();
+
+    return c.json({
+      success: true,
+      data: {
+        popularTopics,
+        totalTopics: popularTopics.length,
+        limit
+      }
+    });
+  } catch (error) {
+    console.error('获取热门主题失败:', error);
+    return c.json({ 
+      error: "获取热门主题失败", 
       details: error instanceof Error ? error.message : '未知错误'
     }, 500);
   }
@@ -172,62 +264,6 @@ topicsRoutes.get("/:entryId", async (c) => {
     console.error('获取主题信息失败:', error);
     return c.json({ 
       error: "获取主题信息失败", 
-      details: error instanceof Error ? error.message : '未知错误'
-    }, 500);
-  }
-});
-
-// 获取主题统计信息
-topicsRoutes.get("/stats", async (c) => {
-  const db = drizzle(c.env.DB);
-  
-  try {
-    // 获取主题统计
-    const stats = await db.select({
-        entryCount: { sql: 'COUNT(*)' },
-        withTopicsCount: { sql: 'COUNT(CASE WHEN topics IS NOT NULL AND topics != \'[]\' THEN 1 END)' },
-        withoutTopicsCount: { sql: 'COUNT(CASE WHEN topics IS NULL OR topics = \'[]\' THEN 1 END)' },
-        avgProcessingTime: { sql: 'AVG(processing_time)' }
-      })
-      .from(processedContents)
-      .all();
-
-    // 获取最热门的主题
-    const popularTopics = await db.select({
-        topic: sql`json_extract(topics, '$[*]')`,
-        count: sql`COUNT(*)`
-      })
-      .from(processedContents)
-      .where(sql`topics IS NOT NULL AND topics != '[]'`)
-      .groupBy(sql`json_extract(topics, '$[*]')`)
-      .orderBy(sql`COUNT(*) DESC`)
-      .limit(10)
-      .all();
-
-    // 按模型统计
-    const modelStats = await db.select({
-        modelUsed: processedContents.modelUsed,
-        count: sql`COUNT(*)`,
-        avgProcessingTime: sql`AVG(processing_time)`
-      })
-      .from(processedContents)
-      .where(sql`modelUsed IS NOT NULL`)
-      .groupBy(sql`modelUsed`)
-      .orderBy(sql`COUNT(*) DESC`)
-      .all();
-
-    return c.json({
-      success: true,
-      data: {
-        stats: stats[0] || {},
-        popularTopics,
-        modelStats
-      }
-    });
-  } catch (error) {
-    console.error('获取主题统计失败:', error);
-    return c.json({ 
-      error: "获取主题统计失败", 
       details: error instanceof Error ? error.message : '未知错误'
     }, 500);
   }

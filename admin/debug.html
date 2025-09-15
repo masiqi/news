@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>管理后台诊断</title>
+    <script src="https://cdn.jsdelivr.net/npm/amis@6.13.0/sdk/sdk.js"></script>
+</head>
+<body>
+    <h1>管理后台诊断</h1>
+    <div id="root"></div>
+    
+    <script>
+        console.log('开始诊断...');
+        
+        // 检查localStorage中的令牌
+        const token = localStorage.getItem('admin_token');
+        console.log('localStorage中的令牌:', token);
+        
+        // 检查当前hash
+        console.log('当前hash:', window.location.hash);
+        
+        // 测试一个简单的amis配置
+        const testConfig = {
+            type: 'page',
+            title: '测试页面',
+            body: {
+                type: 'form',
+                title: '测试表单',
+                body: [
+                    {
+                        type: 'input-text',
+                        name: 'test',
+                        label: '测试字段'
+                    }
+                ]
+            }
+        };
+        
+        try {
+            const amis = amisRequire('amis/embed');
+            console.log('amis库加载成功');
+            
+            const amisInstance = amis.embed('#root', testConfig, {}, {
+                method: 'get',
+                url: 'http://localhost:8101/admin/users/statistics',
+                headers: {
+                    'Authorization': 'Bearer ' + token
+                }
+            });
+            
+            console.log('amis实例创建成功:', amisInstance);
+        } catch (error) {
+            console.error('amis渲染错误:', error);
+            document.getElementById('root').innerHTML = `<div style="color: red;">错误: ${error.message}</div>`;
+        }
+    </script>
+</body>
+</html>

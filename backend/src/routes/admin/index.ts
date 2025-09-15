@@ -144,6 +144,73 @@ adminRoutes.get('/debug/statistics', async (c) => {
   }
 });
 
+// Dashboard 统计信息端点
+adminRoutes.get('/dashboard/statistics', async (c) => {
+  try {
+    const { drizzle } = await import('drizzle-orm/d1');
+    const { users, sources } = await import('../../db/schema');
+    const { count } = await import('drizzle-orm');
+    
+    const db = drizzle(c.env.DB);
+    
+    // 获取用户总数
+    const totalUsersResult = await db.select({ count: count() }).from(users);
+    const totalUsers = totalUsersResult[0].count;
+    
+    // 获取RSS源总数
+    const totalSourcesResult = await db.select({ count: count() }).from(sources);
+    const totalSources = totalSourcesResult[0].count;
+    
+    // 获取今日处理的内容数（这里简化处理）
+    const processedToday = 0; // 实际应该从处理记录表中统计
+    
+    return c.json({
+      success: true,
+      data: {
+        totalUsers,
+        totalSources,
+        processedToday,
+        systemStatus: '正常'
+      }
+    });
+  } catch (error) {
+    console.error('获取仪表板统计失败:', error);
+    return c.json({ 
+      success: false, 
+      error: '获取仪表板统计失败',
+      message: error.message 
+    }, 500);
+  }
+});
+
+// 系统日志端点
+adminRoutes.get('/system/logs', async (c) => {
+  try {
+    // 简化的系统日志，实际应该从日志表中查询
+    const logs = [
+      {
+        level: 'info',
+        message: '系统启动正常',
+        createdAt: new Date().toISOString()
+      }
+    ];
+    
+    return c.json({
+      success: true,
+      data: {
+        logs
+      }
+    });
+  } catch (error) {
+    console.error('获取系统日志失败:', error);
+    return c.json({ 
+      success: false, 
+      error: '获取系统日志失败',
+      message: error.message 
+    }, 500);
+  }
+});
+
 adminRoutes.route('/test', testRoutes);
 
 // 根路径返回API信息

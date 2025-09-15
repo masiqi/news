@@ -9,9 +9,6 @@
       "bucket_name": "news-storage"
     }
   ],
-  "ai": {
-    "binding": "AI"
-  },
   "vars": {
     "JWT_SECRET": "development_jwt_secret_key_for_local_testing_only",
     "ADMIN_USERNAME": "admin",

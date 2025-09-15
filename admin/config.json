@@ -1,7 +1,7 @@
 {
   "development": {
     "backendHost": "localhost",
-    "backendPort": 35563,
+    "backendPort": 8787,
     "adminPort": 8101
   },
   "production": {

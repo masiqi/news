@@ -18,7 +18,7 @@ userRoutes.use('*', adminAuthMiddleware);
 userRoutes.get('/', async (c) => {
   try {
     const { drizzle } = await import('drizzle-orm/d1');
-    const { users, count } = await import('../../db/schema');
+    const { users } = await import('../../db/schema');
     
     const db = drizzle(c.env.DB);
     const query = c.req.query();
@@ -47,8 +47,8 @@ userRoutes.get('/', async (c) => {
     }
     
     // 获取总数
-    const { sql } = await import('drizzle-orm');
-    const countResult = await db.select({ count: sql<number>`count(*)`.mapWith(Number) }).from(users).where(whereCondition);
+    const { count } = await import('drizzle-orm');
+    const countResult = await db.select({ count: count() }).from(users).where(whereCondition);
     const total = countResult[0].count;
     
     // 获取分页数据
@@ -99,18 +99,18 @@ userRoutes.get('/', async (c) => {
 userRoutes.get('/statistics', async (c) => {
   try {
     const { drizzle } = await import('drizzle-orm/d1');
-    const { users, count } = await import('../../db/schema');
+    const { users } = await import('../../db/schema');
     
     const db = drizzle(c.env.DB);
+    const { count } = await import('drizzle-orm');
     
     // 获取用户总数
-    const { sql } = await import('drizzle-orm');
-    const totalUsersResult = await db.select({ count: sql<number>`count(*)`.mapWith(Number) }).from(users);
+    const totalUsersResult = await db.select({ count: count() }).from(users);
     const totalUsers = totalUsersResult[0].count;
     
     // 获取用户状态分布
     const statusDistribution = await db
-      .select({ status: users.status, count: sql<number>`count(*)`.mapWith(Number) })
+      .select({ status: users.status, count: count() })
       .from(users)
       .groupBy(users.status);
     
@@ -122,7 +122,7 @@ userRoutes.get('/statistics', async (c) => {
     
     // 获取用户角色分布
     const roleDistribution = await db
-      .select({ role: users.role, count: sql<number>`count(*)`.mapWith(Number) })
+      .select({ role: users.role, count: count() })
       .from(users)
       .groupBy(users.role);
     
@@ -134,7 +134,7 @@ userRoutes.get('/statistics', async (c) => {
     // 获取最近7天注册用户数
     const { gte } = await import('drizzle-orm');
     const recentRegistrations = await db
-      .select({ count: sql<number>`count(*)`.mapWith(Number) })
+      .select({ count: count() })
       .from(users)
       .where(gte(users.createdAt, new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)));
     
@@ -172,12 +172,64 @@ userRoutes.get('/statistics', async (c) => {
 });
 
 /**
+ * 获取最近用户活动
+ * GET /admin/users/recent
+ */
+userRoutes.get('/recent', async (c) => {
+  try {
+    console.log('DEBUG: /admin/users/recent 被调用');
+    const user = c.get('user');
+    console.log('DEBUG: 当前用户:', user);
+    
+    const { drizzle } = await import('drizzle-orm/d1');
+    const { users } = await import('../../db/schema');
+    
+    const db = drizzle(c.env.DB);
+    const query = c.req.query();
+    
+    const limit = parseInt(query.limit as string) || 10;
+    
+    // 获取最近登录的用户
+    const { desc } = await import('drizzle-orm');
+    const recentUsers = await db
+      .select({
+        id: users.id,
+        email: users.email,
+        status: users.status,
+        role: users.role,
+        lastLoginAt: users.lastLoginAt,
+        createdAt: users.createdAt
+      })
+      .from(users)
+      .orderBy(desc(users.lastLoginAt))
+      .limit(limit);
+    
+    return c.json({
+      success: true,
+      data: {
+        users: recentUsers
+      }
+    });
+  } catch (error) {
+    console.error('获取最近用户活动失败:', error);
+    return c.json({ 
+      success: false, 
+      error: '获取最近用户活动失败',
+      message: error.message 
+    }, 500);
+  }
+});
+
+/**
  * 获取用户详情
  * GET /api/admin/users/:id
  */
 userRoutes.get('/:id', async (c) => {
   try {
-    const userService = c.get('userService');
+    const { UserManagementService } = await import('../../services/admin/user-management.service');
+    const userService = new UserManagementService(c.env.DB);
+    const { CredentialService } = await import('../../services/credential.service');
+    const credentialService = new CredentialService(c.env.DB);
     const userId = parseInt(c.req.param('id'));
     
     if (isNaN(userId)) {
@@ -196,9 +248,24 @@ userRoutes.get('/:id', async (c) => {
       }, 404);
     }
 
+    // 获取用户的同步凭证信息
+    let syncCredentials = [];
+    try {
+      syncCredentials = await credentialService.getUserCredentials(userId);
+    } catch (credentialError) {
+      console.error('获取用户同步凭证失败:', credentialError);
+      // 不影响主流程，继续返回用户基本信息
+    }
+
+    // 将同步凭证信息添加到结果中
+    const resultWithCredentials = {
+      ...result,
+      syncCredentials
+    };
+
     return c.json({
       success: true,
-      data: result
+      data: resultWithCredentials
     });
   } catch (error) {
     console.error('获取用户详情失败:', error);
@@ -367,7 +434,8 @@ userRoutes.put('/:id/role', async (c) => {
  */
 userRoutes.get('/:id/logs', async (c) => {
   try {
-    const auditService = c.get('auditService');
+    const { AuditLogService } = await import('../../services/admin/audit-log.service');
+    const auditService = new AuditLogService(c.env.DB);
     const userId = parseInt(c.req.param('id'));
     const query = c.req.query();
     
@@ -495,7 +563,8 @@ userRoutes.post('/batch', async (c) => {
  */
 userRoutes.get('/:id/sessions', async (c) => {
   try {
-    const auditService = c.get('auditService');
+    const { AuditLogService } = await import('../../services/admin/audit-log.service');
+    const auditService = new AuditLogService(c.env.DB);
     const userId = parseInt(c.req.param('id'));
     const query = c.req.query();
     
@@ -537,7 +606,9 @@ userRoutes.get('/:id/sessions', async (c) => {
  */
 userRoutes.delete('/:id/sessions/:sessionId', async (c) => {
   try {
-    const auditService = c.get('auditService');
+    const { AuditLogService } = await import('../../services/admin/audit-log.service');
+    const auditService = new AuditLogService(c.env.DB);
+    const { getCurrentUser } = await import('../../middleware/admin-auth.middleware');
     const currentUser = getCurrentUser(c);
     
     const userId = parseInt(c.req.param('id'));

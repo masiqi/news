@@ -10,6 +10,7 @@ import { ZhipuAIService } from '../services/ai/zhipu-ai.service';
 import { AIConfigService } from '../services/config/ai-config.service';
 import { ContentAnalyzerService } from '../services/ai/content-analyzer';
 import { MarkdownGenerator } from '../services/ai/markdown-generator';
+import { AutoMarkdownStorageService } from '../services/auto-markdown-storage.service';
 import { QueueMessage, ProcessingResult } from '../services/queue/types';
 
 // 最大失败重试次数
@@ -36,6 +37,7 @@ export default {
     const configService = new AIConfigService(db);
     const contentAnalyzer = new ContentAnalyzerService();
     const markdownGenerator = new MarkdownGenerator();
+    const autoStorageService = new AutoMarkdownStorageService(env);
     
     const consumer = new QueueConsumerService(env.AI_PROCESSOR_QUEUE);
     
@@ -136,6 +138,39 @@ export default {
         
         const totalProcessingTime = Date.now() - startTime;
         console.log(`完整LLM处理流程完成，总耗时: ${totalProcessingTime}ms`);
+        
+        // 自动存储Markdown到用户R2空间
+        if (entryId) {
+          try {
+            console.log(`开始自动存储Markdown到用户${userId}的R2空间...`);
+            
+            const autoStorageResult = await autoStorageService.processAndStoreMarkdown({
+              userId,
+              sourceId,
+              entryId,
+              analysisResult,
+              originalContent: content,
+              metadata: {
+                userId,
+                sourceId,
+                entryId,
+                title: metadata?.title || analysisResult.title,
+                sourceName: metadata?.sourceName,
+                processedAt: new Date()
+              }
+            });
+            
+            if (autoStorageResult.success) {
+              console.log(`✅ 自动存储成功: ${autoStorageResult.filePath} (${autoStorageResult.fileSize}字节)`);
+            } else {
+              console.warn(`⚠️ 自动存储失败: ${autoStorageResult.error}`);
+            }
+            
+          } catch (storageError) {
+            console.error('自动存储过程中出错:', storageError);
+            // 自动存储失败不影响主要处理流程
+          }
+        }
         
         // 如果提供了entryId，缓存完整处理结果
         if (entryId) {

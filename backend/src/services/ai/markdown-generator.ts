@@ -523,20 +523,4 @@ ${result.content}
     };
   }
 
-  /**
-   * 获取默认模板
-   */
-  private getDefaultTemplate(): string {
-    return `{{TITLE}}
-
-{{SUMMARY}}
-
-{{CONTENT}}
-
-## 处理信息
-
-{{METADATA}}
-
-{{FOOTER}}`;
   }
-}

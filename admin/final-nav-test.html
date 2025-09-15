@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>AMIS导航最终测试</title>
+    <script src="https://cdn.jsdelivr.net/npm/amis@6.13.0/sdk/sdk.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; }
+        .success { color: green; }
+        .error { color: red; }
+    </style>
+</head>
+<body>
+    <h1>AMIS导航修复验证</h1>
+    
+    <div class="test-section">
+        <h2>修复内容说明</h2>
+        <p>已将AMIS导航配置从 <code>to</code> 属性改为 <code>onClick</code> 动作：</p>
+        <pre>
+// 修复前（不工作）
+{
+    label: '用户管理',
+    to: '/users',
+    active: hashPath === '/users'
+}
+
+// 修复后（应该工作）
+{
+    label: '用户管理',
+    active: hashPath === '/users',
+    onClick: {
+        actionType: 'url',
+        url: '#/users',
+        blank: false
+    }
+}
+        </pre>
+    </div>
+    
+    <div class="test-section">
+        <h2>测试方法</h2>
+        <ol>
+            <li>访问 <a href="http://localhost:8101" target="_blank">http://localhost:8101</a></li>
+            <li>使用 admin/admin123 登录</li>
+            <li>点击左侧菜单项，观察：
+                <ul>
+                    <li>URL中的hash是否变化</li>
+                    <li>页面内容是否切换</li>
+                    <li>浏览器控制台是否有错误</li>
+                </ul>
+            </li>
+        </ol>
+    </div>
+    
+    <div class="test-section">
+        <h2>技术原理</h2>
+        <p>使用AMIS的 <code>actionType: 'url'</code> 可以确保：</p>
+        <ul>
+            <li>点击导航项时正确改变URL hash</li>
+            <li>触发浏览器的hashchange事件</li>
+            <li>调用 <code>handleHashChange</code> 函数重新渲染页面</li>
+            <li>AMIS的 <code>visibleOn</code> 条件重新计算，显示对应页面内容</li>
+        </ul>
+    </div>
+    
+    <div id="service-status">检查服务状态...</div>
+    
+    <script>
+        // 测试管理后台服务状态
+        fetch('http://localhost:8101/')
+            .then(response => {
+                if (response.ok) {
+                    document.getElementById('service-status').innerHTML = 
+                        '<div class="success">✅ 管理后台服务正常运行</div>';
+                } else {
+                    document.getElementById('service-status').innerHTML = 
+                        '<div class="error">❌ 管理后台服务响应异常</div>';
+                }
+            })
+            .catch(error => {
+                document.getElementById('service-status').innerHTML = 
+                    '<div class="error">❌ 无法连接到管理后台服务: ' + error.message + '</div>';
+            });
+    </script>
+</body>
+</html>
