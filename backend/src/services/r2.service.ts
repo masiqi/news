@@ -276,4 +276,115 @@ export class R2Service {
       return false;
     }
   }
+
+  /**
+   * WebDAV: 列出对象（支持分页和前缀过滤）
+   * @param options 列表选项
+   * @returns Promise<{objects: R2Object[], truncated: boolean, cursor?: string, delimitedPrefixes?: string[]}> 列表结果
+   */
+  async listObjects(options: {
+    prefix?: string;
+    delimiter?: string;
+    cursor?: string;
+    limit?: number;
+  } = {}): Promise<{
+    objects: any[];
+    truncated: boolean;
+    cursor?: string;
+    delimitedPrefixes?: string[];
+  }> {
+    try {
+      const result = await this.r2Bucket.list(options);
+      return {
+        objects: result.objects || [],
+        truncated: result.truncated || false,
+        cursor: result.cursor,
+        delimitedPrefixes: result.delimitedPrefixes || []
+      };
+    } catch (error) {
+      console.error('R2列出对象失败:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * WebDAV: 获取对象信息
+   * @param key 对象键
+   * @returns Promise<any | null> 对象信息
+   */
+  async headObject(key: string): Promise<any | null> {
+    try {
+      const object = await this.r2Bucket.head(key);
+      return object;
+    } catch (error) {
+      if (error && typeof error === 'object' && 'status' in error && (error as any).status === 404) {
+        return null;
+      }
+      console.error(`R2获取对象信息失败: ${key}`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * WebDAV: 获取对象内容
+   * @param key 对象键
+   * @returns Promise<any | null> 对象内容
+   */
+  async getObject(key: string): Promise<any | null> {
+    try {
+      const object = await this.r2Bucket.get(key);
+      return object;
+    } catch (error) {
+      if (error && typeof error === 'object' && 'status' in error && (error as any).status === 404) {
+        return null;
+      }
+      console.error(`R2获取对象失败: ${key}`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * WebDAV: 上传对象
+   * @param key 对象键
+   * @param content 内容
+   * @param options 上传选项
+   * @returns Promise<{key: string, uploaded: Date, etag: string, version: string}> 上传结果
+   */
+  async putObject(key: string, content: string | ArrayBuffer | ReadableStream, options?: {
+    httpMetadata?: Record<string, string>;
+    customMetadata?: Record<string, string>;
+    md5?: string;
+  }): Promise<{
+    key: string;
+    uploaded: Date;
+    etag: string;
+    version: string;
+  }> {
+    try {
+      const result = await this.r2Bucket.put(key, content, options);
+      return {
+        key: result.key,
+        uploaded: result.uploaded,
+        etag: result.etag,
+        version: result.version
+      };
+    } catch (error) {
+      console.error(`R2上传对象失败: ${key}`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * WebDAV: 删除对象
+   * @param key 对象键
+   * @returns Promise<void>
+   */
+  async deleteObject(key: string): Promise<void> {
+    try {
+      await this.r2Bucket.delete(key);
+    } catch (error) {
+      console.error(`R2删除对象失败: ${key}`, error);
+      throw error;
+    }
+  }
 }

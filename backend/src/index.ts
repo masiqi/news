@@ -16,6 +16,7 @@ import userAccessRoutes from "./routes/user-access";
 import adminAccessRoutes from "./routes/admin-access";
 import autoStorageRoutes from "./routes/auto-storage";
 import credentialRoutes from "./routes/credentials";
+import webdavRoutes from "./routes/webdav";
 // 移除测试路由导入
 import llmExtractorRoutes from "./services/llm-extractor";
 import llmContentExtractorRoutes from "./services/llm-content-extractor";
@@ -81,6 +82,9 @@ app.route("/api/admin", adminAccessRoutes);
 
 // 注册自动存储API路由
 app.route("/api", autoStorageRoutes);
+
+// 注册WebDAV路由
+app.route("/webdav", webdavRoutes);
 
 // 移除测试路由注册
 

@@ -31,7 +31,7 @@ async function hashPassword(password: string): Promise<string> {
 }
 
 // 验证密码
-async function verifyPassword(password: string, hashedPassword: string): Promise<boolean> {
+export async function verifyPassword(password: string, hashedPassword: string): Promise<boolean> {
   const [saltHex, hashHex] = hashedPassword.split(':');
   
   // 将十六进制盐值转换为字节数组
