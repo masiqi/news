@@ -141,21 +141,19 @@ function createCrudPageConfig(title, apiConfig, columnsConfig, actionsConfig = {
                             'Authorization': 'Bearer ' + localStorage.getItem('admin_token')
                         },
                         adaptor: function(payload, response) {
-                            console.log('API原始响应:', response);
                             const data = response.data?.data || response.data || response;
-                            console.log('处理后的数据:', data);
                             return {
                                 status: 0,
                                 msg: '',
                                 data: {
-                                    items: data.users || data.items || [],
-                                    total: data.pagination?.total || data.total || 0
+                                    // 支持多种后端数据命名
+                                    items: data.users || data.sources || data.items || [],
+                                    total: (data.pagination && (data.pagination.total || data.pagination?.totalPages && data.pagination?.totalPages * (data.pagination.limit || data.pagination.perPage || 10))) || data.total || 0
                                 }
                             };
                         }
                     },
                     columns: columnsConfig,
-                    features: ['filter', 'create', 'update', 'delete'],
                     filter: {
                         title: '搜索条件',
                         submitText: '搜索',

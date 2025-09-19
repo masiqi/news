@@ -125,13 +125,7 @@ function getUsersPageConfig() {
                     type: 'reload',
                     align: 'right'
                 },
-                {
-                    type: 'create',
-                    label: '新增用户',
-                    icon: 'fa fa-plus',
-                    align: 'right',
-                    dialog: getUserCreateDialogConfig()
-                }
+                // 移除 create 按钮，避免 AMIS 6.13 在 crud.toolbar.create 渲染器缺失时用 <code> dump 配置
             ],
             footerToolbar: [
                 'statistics',
@@ -155,6 +149,25 @@ function getUserDetailDialogConfig() {
                 url: '/admin/users/${id}',
                 headers: {
                     'Authorization': 'Bearer ' + localStorage.getItem('admin_token')
+                },
+                adaptor: function(payload, response) {
+                    const data = response.data?.data || response.data || response;
+                    const user = data.user || {};
+                    // 扁平化为表单可直接使用的字段
+                    return {
+                        status: 0,
+                        msg: '',
+                        data: {
+                            id: user.id,
+                            email: user.email,
+                            status: user.status,
+                            role: user.role,
+                            loginCount: user.loginCount,
+                            lastLoginAt: user.lastLoginAt,
+                            registeredIp: user.registeredIp,
+                            riskLevel: user.riskLevel
+                        }
+                    };
                 }
             },
             body: {
@@ -203,11 +216,10 @@ function getUserDetailDialogConfig() {
                                                     label: '登录次数'
                                                 },
                                                 {
-                                                    type: 'static',
+                                                    type: 'tpl',
                                                     name: 'lastLoginAt',
                                                     label: '最后登录时间',
-                                                    type: 'datetime',
-                                                    format: 'YYYY-MM-DD HH:mm:ss'
+                                                    tpl: '${lastLoginAt|date:YYYY-MM-DD HH:mm:ss}'
                                                 },
                                                 {
                                                     type: 'static',
@@ -230,7 +242,7 @@ function getUserDetailDialogConfig() {
                                     type: 'service',
                                     api: {
                                         method: 'get',
-                                        url: '/admin/users/${id}/roles',
+                                        url: '/admin/roles/users/${id}/roles',
                                         headers: {
                                             'Authorization': 'Bearer ' + localStorage.getItem('admin_token')
                                         }
@@ -239,7 +251,7 @@ function getUserDetailDialogConfig() {
                                         type: 'crud',
                                         api: {
                                             method: 'get',
-                                            url: '/admin/users/${id}/roles',
+                                            url: '/admin/roles/users/${id}/roles',
                                             headers: {
                                                 'Authorization': 'Bearer ' + localStorage.getItem('admin_token')
                                             }
@@ -264,8 +276,8 @@ function getUserDetailDialogConfig() {
                                             {
                                                 name: 'createdAt',
                                                 label: '分配时间',
-                                                type: 'datetime',
-                                                format: 'YYYY-MM-DD HH:mm:ss',
+                                                type: 'tpl',
+                                                tpl: '${createdAt|date:YYYY-MM-DD HH:mm:ss}',
                                                 width: 150
                                             }
                                         ]
@@ -318,8 +330,8 @@ function getUserDetailDialogConfig() {
                                             {
                                                 name: 'createdAt',
                                                 label: '操作时间',
-                                                type: 'datetime',
-                                                format: 'YYYY-MM-DD HH:mm:ss',
+                                                type: 'tpl',
+                                                tpl: '${createdAt|date:YYYY-MM-DD HH:mm:ss}',
                                                 width: 150
                                             }
                                         ]

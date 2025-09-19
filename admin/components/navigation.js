@@ -7,98 +7,29 @@
  * 获取导航配置
  */
 function getNavigationConfig() {
+    const current = (typeof window !== 'undefined' && window.location && window.location.hash) ? window.location.hash : '#/home';
+    const links = [
+        { label: '首页', to: '#/home', icon: 'fa fa-home' },
+        { label: '用户管理', to: '#/users', icon: 'fa fa-users' },
+        { label: 'RSS源管理', to: '#/sources', icon: 'fa fa-rss' },
+        { label: 'Markdown管理', to: '#/markdown', icon: 'fa fa-file-text' },
+        { label: '内容管理', to: '#/content', icon: 'fa fa-newspaper-o' }
+    ].map(item => ({ ...item, active: item.to === current }));
+
     return {
         type: 'nav',
         stacked: true,
-        mode: 'inline', // 使用内联模式作为侧边栏
+        mode: 'inline',
         className: 'admin-nav',
-        style: {
-            width: '220px'
-        },
-        links: [
-            {
-                label: '首页',
-                to: '/',
-                icon: 'fa fa-home',
-                active: true
-            },
-            {
-                label: '用户管理',
-                icon: 'fa fa-users',
-                children: [
-                    {
-                        label: '用户列表',
-                        to: '/users/list',
-                        icon: 'fa fa-list'
-                    },
-                    {
-                        label: '用户统计',
-                        to: '/users/statistics',
-                        icon: 'fa fa-bar-chart'
-                    }
-                ]
-            },
-            {
-                label: '内容管理',
-                icon: 'fa fa-file-text',
-                children: [
-                    {
-                        label: 'RSS源管理',
-                        to: '/content/sources',
-                        icon: 'fa fa-rss'
-                    },
-                    {
-                        label: '文章管理',
-                        to: '/content/articles',
-                        icon: 'fa fa-newspaper-o'
-                    },
-                    {
-                        label: '分类管理',
-                        to: '/content/categories',
-                        icon: 'fa fa-tags'
-                    }
-                ]
-            },
-            {
-                label: '系统设置',
-                icon: 'fa fa-cog',
-                children: [
-                    {
-                        label: '系统统计',
-                        to: '/system/statistics',
-                        icon: 'fa fa-line-chart'
-                    },
-                    {
-                        label: '日志管理',
-                        to: '/system/logs',
-                        icon: 'fa fa-file-text-o'
-                    },
-                    {
-                        label: '系统配置',
-                        to: '/system/config',
-                        icon: 'fa fa-wrench'
-                    }
-                ]
-            }
-        ],
+        style: { width: '220px' },
+        links,
+        // 移除调试用 toast，点击后仅执行跳转
         onEvent: {
             click: {
                 actions: [
                     {
-                        actionType: 'toast',
-                        args: {
-                            msg: '导航到: ${event.data.item.label}'
-                        }
-                    }
-                ]
-            },
-            change: {
-                actions: [
-                    {
-                        actionType: 'toast',
-                        args: {
-                            msg: '切换到: ${event.data.value[0]?.label}'
-                        }
+                        actionType: 'custom',
+                        script: 'window.location.hash = event.data.item.to'
                     }
                 ]
             }

@@ -52,7 +52,7 @@ llmExtractorRoutes.post("/extract", async (c) => {
       link: url,
       isHtml: true,
       apiKey: apiKey
-    });
+    }, c.env);
     
     // 3. 如果提供了entryId，保存到数据库
     if (entryId) {
@@ -238,7 +238,7 @@ llmExtractorRoutes.post("/extract-entry/:entryId", async (c) => {
       link: url,
       isHtml: true,
       apiKey: apiKey
-    });
+    }, c.env);
     
     // 3. 保存到数据库并更新状态
     console.log('步骤3: 保存提取结果到数据库...');

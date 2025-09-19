@@ -1,4 +1,5 @@
 const http = require('http');
+const https = require('https');
 const url = require('url');
 const fs = require('fs');
 const path = require('path');
@@ -41,11 +42,9 @@ const server = http.createServer((req, res) => {
   const isFrontendRoute = frontendRoutes.some(route => pathname.startsWith(route));
   
   if (isApiRequest && !isFrontendRoute) {
-    // 构造后端API的路径 - 对于/api/前缀的请求，去掉/api前缀
+    // 构造后端API的路径
+    // 注意：不要移除 '/api' 前缀，否则诸如 '/api/content' 将被错误转发为 '/content'
     let backendPath = pathname;
-    if (pathname.startsWith('/api/')) {
-      backendPath = pathname.substring(4); // 去掉'/api'前缀
-    }
     
     // 处理查询参数
     const query = parsedUrl.query;
@@ -121,12 +120,38 @@ const server = http.createServer((req, res) => {
     
     return;
   }
+
+  // 代理 amis sdk 中引用的 Font Awesome webfonts，避免 CDN 缺少文件导致 404
+  if (pathname.startsWith('/thirds/@fortawesome/fontawesome-free/webfonts/')) {
+    const filename = pathname.split('/').pop();
+    const cdnUrl = `https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/webfonts/${filename}`;
+    https.get(cdnUrl, (fontRes) => {
+      if (fontRes.statusCode && fontRes.statusCode >= 300 && fontRes.statusCode < 400 && fontRes.headers.location) {
+        return https.get(fontRes.headers.location, (redir) => redir.pipe(res));
+      }
+      const ext = path.extname(filename).toLowerCase();
+      const typeMap = { '.woff2': 'font/woff2', '.woff': 'font/woff', '.ttf': 'font/ttf' };
+      res.writeHead(fontRes.statusCode || 200, { 'Content-Type': typeMap[ext] || 'application/octet-stream' });
+      fontRes.pipe(res);
+    }).on('error', (e) => {
+      res.writeHead(404);
+      res.end('Font not found');
+    });
+    return;
+  }
+
+  // 将形如 /content/articles 这类历史路径重定向为 hash 路由，避免出现 /content/articles#/users 组合
+  const historyPrefixes = ['/users/', '/content/', '/system/'];
+  if (historyPrefixes.some(p => pathname.startsWith(p))) {
+    const first = pathname.split('/')[1];
+    res.writeHead(302, { Location: `/#/${first}` });
+    res.end();
+    return;
+  }
   
-  // 静态文件服务 - 支持前端单页应用路由
+  // 静态文件服务 - 只为实际静态资源返回文件，其余返回 index.html 以支持 hash/history 路由
   let filePath = '.' + pathname;
-  
-  // 如果是根路径或者没有扩展名的路径（前端路由），返回index.html
-  if (filePath === './' || !path.extname(filePath)) {
+  if (filePath === './' || !path.extname(filePath) || pathname.startsWith('/content/') || pathname.startsWith('/users/') || pathname.startsWith('/system/')) {
     filePath = './index.html';
   }
   

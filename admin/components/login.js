@@ -21,7 +21,7 @@ function getLoginPageConfig() {
                 method: 'post',
                 url: 'http://localhost:8787/auth/admin-login',
                 adaptor: function(payload) {
-                    console.log('登录响应:', payload);
+                    // 处理登录响应
                     if (payload.message === '管理员登录成功') {
                         // 登录成功，保存token
                         localStorage.setItem('admin_logged_in', 'true');
@@ -35,7 +35,7 @@ function getLoginPageConfig() {
                         
                         // 跳转到管理后台
                         setTimeout(() => {
-                            window.location.hash = '#/';
+                            window.location.hash = '#/home';
                             if (typeof renderAdminPage === 'function') {
                                 renderAdminPage();
                             }

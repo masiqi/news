@@ -355,6 +355,7 @@ adminMarkdownRoutes.post('/admin/markdown/:id/regenerate', requireAuth, requireA
       link: entry.link,
       apiKey: c.env.ZHIPUAI_API_KEY,
       db: db,
+      env: c.env,
       forceRegenerate: true
     });
 
@@ -436,6 +437,7 @@ adminMarkdownRoutes.post('/admin/markdown/batch-regenerate', requireAuth, requir
             link: entry.link,
             apiKey: c.env.ZHIPUAI_API_KEY,
             db: db,
+            env: c.env,
             forceRegenerate: force
           });
 

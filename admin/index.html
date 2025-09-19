@@ -4,9 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI资讯平台管理后台</title>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/amis/6.13.0/sdk.min.css" rel="stylesheet"/>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css" rel="stylesheet"/>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/amis/6.13.0/sdk.js"></script>
+    <!-- Use jsDelivr CDN for complete AMIS bundle (includes proper third assets) -->
+    <link href="https://cdn.jsdelivr.net/npm/amis@6.13.0/sdk/sdk.css" rel="stylesheet"/>
+    <script src="https://cdn.jsdelivr.net/npm/amis@6.13.0/sdk/sdk.js"></script>
     <style>
         /* 自定义导航样式 */
         .nav-page {
@@ -60,7 +60,8 @@
                     '/components/login.js', 
                     '/components/dashboard.js',
                     '/components/user-management.js',
-                    '/components/rss-management.js'
+                    '/components/rss-management.js',
+                    '/components/content-management.js'
                 ];
                 
                 let loadedCount = 0;
@@ -73,9 +74,10 @@
                     }
                 }
                 
+                const version = Date.now();
                 componentFiles.forEach(file => {
                     const script = document.createElement('script');
-                    script.src = file;
+                    script.src = file + '?v=' + version;
                     script.onload = checkAllLoaded;
                     script.onerror = () => console.error('Failed to load:', file);
                     document.head.appendChild(script);
@@ -326,13 +328,23 @@
                     schema = getMarkdownPageConfig();
                     break;
                 case '/content':
-                    schema = getContentPageConfig();
+                    schema = (window.ContentComponents && window.ContentComponents.getContentPageConfig)
+                      ? window.ContentComponents.getContentPageConfig()
+                      : getContentPageConfig();
                     break;
                 default:
                     schema = getHomePageConfig();
             }
-            
-            const amisScoped = amis.require('amis/embed').embed('#root', schema);
+            // 始终包裹导航布局，保证左侧导航固定，右侧内容切换
+            if (typeof NavComponents !== 'undefined' && NavComponents.createNavLayout) {
+                const wrapped = NavComponents.createNavLayout({
+                    title: 'AI资讯平台管理后台',
+                    body: schema.body ? schema.body : schema
+                });
+                amis.require('amis/embed').embed('#root', wrapped);
+            } else {
+                amis.require('amis/embed').embed('#root', schema);
+            }
         }
 
         // 简单的Markdown管理页面
@@ -348,15 +360,18 @@
             };
         }
 
-        // 简单的内容管理页面
+        // 内容管理页面占位：如模块已加载则委托给模块
         function getContentPageConfig() {
+            if (window.ContentComponents && typeof window.ContentComponents.getContentPageConfig === 'function') {
+                return window.ContentComponents.getContentPageConfig();
+            }
             return {
                 type: 'page',
                 title: '内容管理',
                 body: {
                     type: 'alert',
                     level: 'info',
-                    body: '内容管理功能正在开发中...'
+                    body: '内容管理模块加载中，请稍后重试...'
                 }
             };
         }
@@ -385,43 +400,9 @@
 
         // 页面加载完成后初始化应用 - 已移至动态加载机制中
 
-        // 全局错误处理
+        // 全局错误处理（仅记录到控制台，不弹出提示）
         window.addEventListener('error', function(e) {
-            console.error('页面错误:', e.error);
-            // 避免页面空白，可以显示错误信息
-            const errorDiv = document.createElement('div');
-            errorDiv.style.cssText = `
-                position: fixed;
-                top: 10px;
-                right: 10px;
-                background: #f8d7da;
-                color: #721c24;
-                padding: 10px;
-                border-radius: 5px;
-                border: 1px solid #f5c6cb;
-                z-index: 10000;
-                max-width: 300px;
-            `;
-            errorDiv.innerHTML = `
-                <strong>错误:</strong> ${e.message || '页面发生错误'}
-                <button onclick="this.parentElement.remove()" style="
-                    background: #721c24;
-                    color: white;
-                    border: none;
-                    padding: 2px 8px;
-                    border-radius: 3px;
-                    cursor: pointer;
-                    margin-left: 10px;
-                ">×</button>
-            `;
-            document.body.appendChild(errorDiv);
-            
-            // 5秒后自动移除
-            setTimeout(() => {
-                if (errorDiv.parentElement) {
-                    errorDiv.remove();
-                }
-            }, 5000);
+            console.error('页面错误:', e.error || e.message || e);
         });
 
         // 创建全局的amis实例

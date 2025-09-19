@@ -50,7 +50,7 @@ llmContentRoutes.post("/extract-llm", async (c) => {
       link: url,
       isHtml: true,
       apiKey: apiKey
-    });
+    }, c.env);
     
     const endTime = Date.now();
     console.log(`统一LLM内容提取完成，总耗时: ${endTime - startTime}ms`);
@@ -97,7 +97,7 @@ llmContentRoutes.post("/extract-topics", async (c) => {
       return c.json({ error: "智谱AI API Key未配置" }, 500);
     }
     
-    const result = await UnifiedLLMService.extractTopics(title, content, apiKey);
+    const result = await UnifiedLLMService.extractTopics(title, content, apiKey, c.env);
     
     return c.json({
       success: true,
@@ -128,7 +128,7 @@ llmContentRoutes.post("/extract-content", async (c) => {
       return c.json({ error: "智谱AI API Key未配置" }, 500);
     }
     
-    const result = await UnifiedLLMService.extractContent(html, url, title, apiKey);
+    const result = await UnifiedLLMService.extractContent(html, url, title, apiKey, c.env);
     
     return c.json({
       success: true,
@@ -179,7 +179,7 @@ llmContentRoutes.post("/test-specific-url", async (c) => {
       link: testUrl,
       isHtml: true,
       apiKey: apiKey
-    });
+    }, c.env);
     
     return c.json({
       success: true,

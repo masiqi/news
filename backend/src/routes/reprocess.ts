@@ -86,7 +86,8 @@ reprocessRoutes.post("/", async (c) => {
       link: rssEntry.link,
       isHtml: webContentFetched,
       apiKey: apiKey,
-      db: db
+      db: db,
+      env: c.env
     });
 
     console.log(`🎉 统一LLM重新处理完成，条目ID: ${entryId}`);

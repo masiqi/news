@@ -10,18 +10,20 @@ const adminStatisticsRoutes = new Hono<{ Bindings: CloudflareBindings }>();
 // 应用所有管理员路由的中间件
 adminStatisticsRoutes.use('*', adminAuthMiddleware, adminAuditMiddleware);
 
-// 初始化服务
-const sourceStateService = new SourceStateService();
+// 注意：不要在模块级别持有未绑定数据库的服务实例。
+// 在每个请求中根据 env.DB 初始化 db，并传入服务，避免 "Database connection not provided" 错误。
 
 // 获取总体统计信息
 adminStatisticsRoutes.get('/overview', async (c) => {
   try {
+    const db = initDB(c.env.DB);
+    const sourceStateService = new SourceStateService(db);
     const now = new Date();
     const last30Days = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
     const last7Days = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
 
     // 获取推荐源统计
-    const recommendedStats = await sourceStateService.getRecommendedSourcesStatistics();
+    const recommendedStats = await sourceStateService.getRecommendedSourcesStatistics(db);
 
     // 获取所有源统计
     const [totalSourcesResult] = await initDB(c.env.DB)
@@ -144,6 +146,7 @@ adminStatisticsRoutes.get('/overview', async (c) => {
 // 获取时间序列统计
 adminStatisticsRoutes.get('/timeline', async (c) => {
   try {
+    const db = initDB(c.env.DB);
     const { period = '30d', granularity = 'day' } = c.req.query();
     
     let daysBack = 30;
@@ -220,6 +223,7 @@ adminStatisticsRoutes.get('/timeline', async (c) => {
 // 获取源详情统计
 adminStatisticsRoutes.get('/sources/:id', async (c) => {
   try {
+    const db = initDB(c.env.DB);
     const sourceId = parseInt(c.req.param('id'));
     
     if (isNaN(sourceId)) {

@@ -101,19 +101,22 @@ export interface QueueSendBatchOptions {
 
 // Workers AI接口
 export interface Ai {
-  run: (options: AiRunOptions) => Promise<AiResponse>;
+  // Workers AI binding supports: ai.run(model, { input or messages ... })
+  run: (model: string, options: any) => Promise<any>;
 }
 
+// Keep legacy types for reference in case of future use
 export interface AiRunOptions {
   model: string;
-  messages: Array<{
+  messages?: Array<{
     role: 'system' | 'user' | 'assistant';
     content: string;
   }>;
+  input?: string;
   temperature?: number;
   max_tokens?: number;
 }
 
 export interface AiResponse {
-  response: string;
+  response?: string;
 }

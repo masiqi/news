@@ -2,6 +2,7 @@
 import { drizzle } from 'drizzle-orm/d1';
 import { rssEntries, processedContents } from '../db/schema';
 import { eq } from 'drizzle-orm';
+import { CloudflareLLMService } from './cloudflare-llm.service';
 
 export interface LLMAnalysisResult {
   topics: string[];
@@ -38,8 +39,9 @@ export class UnifiedLLMService {
   
   /**
    * 主要的内容分析函数 - 一次性完成所有LLM处理任务
+   * 首先尝试使用智谱GLM，如果失败则自动切换到Cloudflare AI
    */
-  static async analyzeContent(params: LLMProcessingParams): Promise<LLMAnalysisResult> {
+  static async analyzeContent(params: LLMProcessingParams, env?: any): Promise<LLMAnalysisResult> {
     const { title, content, link, isHtml = false, apiKey } = params;
     const startTime = Date.now();
 
@@ -47,6 +49,41 @@ export class UnifiedLLMService {
     console.log(`📋 内容长度: ${content.length} 字符`);
     console.log(`🔄 内容类型: ${isHtml ? 'HTML格式' : '文本格式'}`);
     console.log(`🔗 来源链接: ${link || '无'}`);
+
+    try {
+      // 首先尝试使用智谱GLM
+      console.log(`🤖 首次尝试使用智谱GLM进行分析...`);
+      const glmResult = await this.analyzeWithGLM(params);
+      console.log(`✅ 智谱GLM分析成功`);
+      return glmResult;
+    } catch (glmError) {
+      console.error(`❌ 智谱GLM分析失败:`, glmError);
+      
+      // 如果提供了env参数，尝试使用Cloudflare AI作为备用方案
+      if (env) {
+        console.log(`🔄 尝试使用Cloudflare AI作为备用方案...`);
+        try {
+          const cfResult = await CloudflareLLMService.analyzeContent(params, env);
+          console.log(`✅ Cloudflare AI分析成功`);
+          return cfResult;
+        } catch (cfError) {
+          console.error(`❌ Cloudflare AI分析也失败:`, cfError);
+          // 如果Cloudflare AI也失败，抛出原始的GLM错误
+          throw glmError;
+        }
+      } else {
+        // 没有提供env参数，无法使用备用方案，直接抛出错误
+        throw glmError;
+      }
+    }
+  }
+
+  /**
+   * 使用智谱GLM进行内容分析
+   */
+  private static async analyzeWithGLM(params: LLMProcessingParams): Promise<LLMAnalysisResult> {
+    const { title, content, link, isHtml = false, apiKey } = params;
+    const startTime = Date.now();
 
     // 构建专门的分析提示，包含主题、关键词、情感分析、内容解读和教育价值
     const prompt = this.buildAnalysisPrompt(title, content, isHtml);
@@ -192,11 +229,11 @@ export class UnifiedLLMService {
   /**
    * 分析内容并保存到数据库（完整流程）
    */
-  static async analyzeAndSave(params: LLMProcessingParams & { db: any }): Promise<LLMAnalysisResult> {
-    const { entryId, db, ...analysisParams } = params;
+  static async analyzeAndSave(params: LLMProcessingParams & { db: any, env?: any }): Promise<LLMAnalysisResult> {
+    const { entryId, db, env, ...analysisParams } = params;
     
     // 执行AI分析
-    const result = await this.analyzeContent(analysisParams);
+    const result = await this.analyzeContent(analysisParams, env);
     
     if (entryId) {
       // 保存结果到数据库
@@ -340,12 +377,12 @@ ${isHtml ? `
   /**
    * 简化的主题提取函数（用于兼容旧代码）
    */
-  static async extractTopics(title: string, content: string, apiKey: string): Promise<{ topics: string[]; keywords: string[] }> {
+  static async extractTopics(title: string, content: string, apiKey: string, env?: any): Promise<{ topics: string[]; keywords: string[] }> {
     const result = await this.analyzeContent({
       title,
       content,
       apiKey
-    });
+    }, env);
 
     return {
       topics: result.topics,
@@ -356,7 +393,7 @@ ${isHtml ? `
   /**
    * 简化的内容提取函数（用于兼容旧代码）
    */
-  static async extractContent(html: string, url: string, title: string, apiKey: string): Promise<{
+  static async extractContent(html: string, url: string, title: string, apiKey: string, env?: any): Promise<{
     title: string;
     content: string;
     summary: string;
@@ -368,7 +405,7 @@ ${isHtml ? `
       link: url,
       isHtml: true,
       apiKey
-    });
+    }, env);
 
     return {
       title,

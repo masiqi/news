@@ -186,7 +186,7 @@ export default {
           title: `队列处理内容 - 源ID ${sourceId}`,
           content: content || '',
           apiKey: env.ZHIPUAI_API_KEY
-        });
+        }, env);
         
         console.log(`统一LLM分析完成:`);
         console.log(`   - 主题 (${result.topics.length}个): ${result.topics.join(', ')}`);

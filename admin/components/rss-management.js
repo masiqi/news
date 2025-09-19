@@ -10,7 +10,7 @@ function getRssSourcesPageConfig() {
     return createCrudPageConfig(
         'RSS源管理',
         {
-            statisticsApi: '/admin/sources/statistics',
+            statisticsApi: '/admin/statistics/overview',
             listApi: '/admin/sources'
         },
         [
@@ -68,15 +68,8 @@ function getRssSourcesPageConfig() {
             {
                 type: 'operation',
                 label: '操作',
-                width: 180,
+                width: 120,
                 buttons: [
-                    {
-                        type: 'button',
-                        icon: 'fa fa-edit',
-                        tooltip: '编辑源',
-                        actionType: 'dialog',
-                        dialog: getRssSourceEditDialogConfig()
-                    },
                     {
                         type: 'button',
                         icon: 'fa fa-refresh',
@@ -85,21 +78,7 @@ function getRssSourcesPageConfig() {
                         confirmText: '确定要立即获取该RSS源的内容吗？',
                         api: {
                             method: 'post',
-                            url: '/admin/sources/${id}/fetch',
-                            headers: {
-                                'Authorization': 'Bearer ' + localStorage.getItem('admin_token')
-                            }
-                        }
-                    },
-                    {
-                        type: 'button',
-                        icon: 'fa fa-trash',
-                        tooltip: '删除源',
-                        actionType: 'ajax',
-                        confirmText: '确定要删除该RSS源吗？此操作不可恢复！',
-                        api: {
-                            method: 'delete',
-                            url: '/admin/sources/${id}',
+                            url: '/sources/${id}/trigger-fetch',
                             headers: {
                                 'Authorization': 'Bearer ' + localStorage.getItem('admin_token')
                             }
@@ -122,13 +101,6 @@ function getRssSourcesPageConfig() {
                 {
                     type: 'reload',
                     align: 'right'
-                },
-                {
-                    type: 'create',
-                    label: '添加RSS源',
-                    icon: 'fa fa-plus',
-                    align: 'right',
-                    dialog: getRssSourceCreateDialogConfig()
                 }
             ],
             footerToolbar: [

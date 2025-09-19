@@ -213,7 +213,8 @@ async function processRssFetch(sourceId: number, rssUrl: string, env: Cloudflare
               link: entry.link,
               isHtml: webContentFetched,
               apiKey: env.ZHIPUAI_API_KEY,
-              db: db
+              db: db,
+              env
             });
             
             console.log(`✅ 条目 ${rssEntry.id} 统一LLM分析完成`);
