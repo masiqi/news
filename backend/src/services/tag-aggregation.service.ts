@@ -23,7 +23,7 @@ export class TagAggregationServiceImpl implements TagAggregationService {
    * 处理单个内容的标签聚合
    */
   async processContentTags(processedContentId: number, db: any): Promise<void> {
-    console.log(`🏷️ 开始处理内容标签聚合，processedContentId: ${processedContentId}`);
+    console.log(`[TAG] 开始处理内容标签聚合，processedContentId: ${processedContentId}`);
 
     try {
       // 获取处理后的内容和关联信息
@@ -40,7 +40,7 @@ export class TagAggregationServiceImpl implements TagAggregationService {
         .limit(1);
 
       if (!processedContent) {
-        console.warn(`⚠️ 未找到处理后的内容，ID: ${processedContentId}`);
+        console.warn(`[WARN] 未找到处理后的内容，ID: ${processedContentId}`);
         return;
       }
 
@@ -58,7 +58,7 @@ export class TagAggregationServiceImpl implements TagAggregationService {
         .limit(1);
 
       if (!entryInfo) {
-        console.warn(`⚠️ 未找到条目信息，entryId: ${processedContent.entryId}`);
+        console.warn(`[WARN] 未找到条目信息，entryId: ${processedContent.entryId}`);
         return;
       }
 
@@ -68,7 +68,7 @@ export class TagAggregationServiceImpl implements TagAggregationService {
       const topics = this.parseTopics(processedContent.topics);
       const keywords = this.parseKeywords(processedContent.keywords);
 
-      console.log(`📝 解析标签 - 主题: ${topics.length}, 关键词: ${keywords.length}`);
+      console.log(`[PROMPT] 解析标签 - 主题: ${topics.length}, 关键词: ${keywords.length}`);
 
       // 处理主题聚合
       for (const topicName of topics) {
@@ -80,9 +80,9 @@ export class TagAggregationServiceImpl implements TagAggregationService {
         await this.processKeyword(userId, keywordName, processedContent.entryId, processedContent.id, db);
       }
 
-      console.log(`✅ 内容标签聚合处理完成，ID: ${processedContentId}`);
+      console.log(`[SUCCESS] 内容标签聚合处理完成，ID: ${processedContentId}`);
     } catch (error) {
-      console.error('❌ 处理内容标签聚合失败:', error);
+      console.error('[ERROR] 处理内容标签聚合失败:', error);
       throw error;
     }
   }
@@ -113,7 +113,7 @@ export class TagAggregationServiceImpl implements TagAggregationService {
           })
           .where(eq(userTopics.id, topicId));
         
-        console.log(`🔄 更新主题: ${topicName}, 计数: ${existingTopic.entryCount + 1}`);
+        console.log(`[UPDATE] 更新主题: ${topicName}, 计数: ${existingTopic.entryCount + 1}`);
       } else {
         // 创建新主题
         const [newTopic] = await db
@@ -129,13 +129,13 @@ export class TagAggregationServiceImpl implements TagAggregationService {
           .returning();
         
         topicId = newTopic.id;
-        console.log(`🆕 创建新主题: ${topicName}`);
+        console.log(`[CREATE] 创建新主题: ${topicName}`);
       }
 
       // 创建主题与条目的关联
       await this.createTopicRelation(userId, topicId, entryId, processedContentId, db);
     } catch (error) {
-      console.error(`❌ 处理主题聚合失败: ${topicName}`, error);
+      console.error(`[ERROR] 处理主题聚合失败: ${topicName}`, error);
       throw error;
     }
   }
@@ -166,7 +166,7 @@ export class TagAggregationServiceImpl implements TagAggregationService {
           })
           .where(eq(userKeywords.id, keywordId));
         
-        console.log(`🔄 更新关键词: ${keywordName}, 计数: ${existingKeyword.entryCount + 1}`);
+        console.log(`[UPDATE] 更新关键词: ${keywordName}, 计数: ${existingKeyword.entryCount + 1}`);
       } else {
         // 创建新关键词
         const [newKeyword] = await db
@@ -182,13 +182,13 @@ export class TagAggregationServiceImpl implements TagAggregationService {
           .returning();
         
         keywordId = newKeyword.id;
-        console.log(`🆕 创建新关键词: ${keywordName}`);
+        console.log(`[CREATE] 创建新关键词: ${keywordName}`);
       }
 
       // 创建关键词与条目的关联
       await this.createKeywordRelation(userId, keywordId, entryId, processedContentId, db);
     } catch (error) {
-      console.error(`❌ 处理关键词聚合失败: ${keywordName}`, error);
+      console.error(`[ERROR] 处理关键词聚合失败: ${keywordName}`, error);
       throw error;
     }
   }
@@ -218,7 +218,7 @@ export class TagAggregationServiceImpl implements TagAggregationService {
         });
       }
     } catch (error) {
-      console.error(`❌ 创建主题关联失败: topicId=${topicId}, entryId=${entryId}`, error);
+      console.error(`[ERROR] 创建主题关联失败: topicId=${topicId}, entryId=${entryId}`, error);
       throw error;
     }
   }
@@ -248,7 +248,7 @@ export class TagAggregationServiceImpl implements TagAggregationService {
         });
       }
     } catch (error) {
-      console.error(`❌ 创建关键词关联失败: keywordId=${keywordId}, entryId=${entryId}`, error);
+      console.error(`[ERROR] 创建关键词关联失败: keywordId=${keywordId}, entryId=${entryId}`, error);
       throw error;
     }
   }
@@ -278,7 +278,7 @@ export class TagAggregationServiceImpl implements TagAggregationService {
 
       return topics;
     } catch (error) {
-      console.error('❌ 获取用户主题失败:', error);
+      console.error('[ERROR] 获取用户主题失败:', error);
       throw error;
     }
   }
@@ -308,7 +308,7 @@ export class TagAggregationServiceImpl implements TagAggregationService {
 
       return keywords;
     } catch (error) {
-      console.error('❌ 获取用户关键词失败:', error);
+      console.error('[ERROR] 获取用户关键词失败:', error);
       throw error;
     }
   }
@@ -368,7 +368,7 @@ export class TagAggregationServiceImpl implements TagAggregationService {
         webContent: entry.webContent || null
       }));
     } catch (error) {
-      console.error(`❌ 根据主题获取内容失败: ${topicName}`, error);
+      console.error(`[ERROR] 根据主题获取内容失败: ${topicName}`, error);
       throw error;
     }
   }
@@ -428,7 +428,7 @@ export class TagAggregationServiceImpl implements TagAggregationService {
         webContent: entry.webContent || null
       }));
     } catch (error) {
-      console.error(`❌ 根据关键词获取内容失败: ${keywordName}`, error);
+      console.error(`[ERROR] 根据关键词获取内容失败: ${keywordName}`, error);
       throw error;
     }
   }
@@ -485,7 +485,7 @@ export class TagAggregationServiceImpl implements TagAggregationService {
 
       return results;
     } catch (error) {
-      console.error(`❌ 搜索标签失败: ${query}`, error);
+      console.error(`[ERROR] 搜索标签失败: ${query}`, error);
       throw error;
     }
   }
@@ -500,7 +500,7 @@ export class TagAggregationServiceImpl implements TagAggregationService {
       const topics = JSON.parse(topicsJson);
       return Array.isArray(topics) ? topics.map(t => String(t).trim()).filter(Boolean) : [];
     } catch (error) {
-      console.warn('⚠️ 解析主题JSON失败:', error);
+      console.warn('[WARN] 解析主题JSON失败:', error);
       return [];
     }
   }
@@ -517,7 +517,7 @@ export class TagAggregationServiceImpl implements TagAggregationService {
         .map(k => k.trim())
         .filter(Boolean);
     } catch (error) {
-      console.warn('⚠️ 解析关键词字符串失败:', error);
+      console.warn('[WARN] 解析关键词字符串失败:', error);
       return [];
     }
   }

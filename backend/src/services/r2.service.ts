@@ -32,7 +32,7 @@ export class R2Service {
       const configDirPath = `user-${userId}/config/.gitkeep`;
       await this.r2Bucket.put(configDirPath, new Uint8Array());
       
-      console.log(`✅ 用户${userId}的R2存储目录创建成功，路径：user-${userId}/`);
+      console.log(`[SUCCESS] 用户${userId}的R2存储目录创建成功，路径：user-${userId}/`);
       return true;
     } catch (error) {
       console.error(`为用户${userId}创建存储目录失败:`, error);
@@ -74,7 +74,7 @@ export class R2Service {
         deletedCount++;
       }
       
-      console.log(`✅ 用户${userId}的R2存储目录删除成功，共删除${deletedCount}个文件`);
+      console.log(`[SUCCESS] 用户${userId}的R2存储目录删除成功，共删除${deletedCount}个文件`);
       return true;
     } catch (error) {
       console.error(`删除用户${userId}存储目录失败:`, error);
@@ -157,7 +157,7 @@ export class R2Service {
         await this.r2Bucket.put(filePath, content);
       }
       
-      console.log(`✅ 文件上传成功：${filePath}`);
+      console.log(`[SUCCESS] 文件上传成功：${filePath}`);
       return filePath;
     } catch (error) {
       console.error(`上传文件到用户${userId}存储空间失败:`, error);
@@ -269,7 +269,7 @@ export class R2Service {
       
       // 删除文件
       await this.r2Bucket.delete(filePath);
-      console.log(`✅ 文件删除成功：${filePath}`);
+      console.log(`[SUCCESS] 文件删除成功：${filePath}`);
       return true;
     } catch (error) {
       console.error(`删除用户${userId}文件失败:`, error);

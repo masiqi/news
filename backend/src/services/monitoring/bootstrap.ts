@@ -7,21 +7,21 @@ import { db } from '../db';
  */
 export async function initializeMonitoring(): Promise<void> {
   try {
-    console.log('🚀 启动监控系统...');
+    console.log('[START] 启动监控系统...');
     
     const monitoringService = MonitoringService.getInstance();
     
     // 初始化监控系统
     await monitoringService.initialize();
     
-    console.log('✅ 监控系统启动成功');
+    console.log('[SUCCESS] 监控系统启动成功');
     
     // 获取系统状态
     const status = await monitoringService.getStatus();
-    console.log('📊 监控系统状态:', JSON.stringify(status, null, 2));
+    console.log('[STATS] 监控系统状态:', JSON.stringify(status, null, 2));
     
   } catch (error) {
-    console.error('❌ 监控系统启动失败:', error);
+    console.error('[ERROR] 监控系统启动失败:', error);
     throw error;
   }
 }
@@ -32,17 +32,17 @@ export async function initializeMonitoring(): Promise<void> {
  */
 export async function shutdownMonitoring(): Promise<void> {
   try {
-    console.log('🛑 停止监控系统...');
+    console.log('[STOP] 停止监控系统...');
     
     const monitoringService = MonitoringService.getInstance();
     
     // 停止监控系统
     await monitoringService.shutdown();
     
-    console.log('✅ 监控系统已停止');
+    console.log('[SUCCESS] 监控系统已停止');
     
   } catch (error) {
-    console.error('❌ 监控系统停止失败:', error);
+    console.error('[ERROR] 监控系统停止失败:', error);
     throw error;
   }
 }
@@ -80,9 +80,9 @@ export async function reloadMonitoringConfig(config: any) {
   try {
     const monitoringService = MonitoringService.getInstance();
     await monitoringService.reloadConfig(config);
-    console.log('✅ 监控系统配置重载成功');
+    console.log('[SUCCESS] 监控系统配置重载成功');
   } catch (error) {
-    console.error('❌ 监控系统配置重载失败:', error);
+    console.error('[ERROR] 监控系统配置重载失败:', error);
     throw error;
   }
 }

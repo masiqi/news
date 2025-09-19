@@ -146,7 +146,7 @@ export class AutoMarkdownStorageService {
 
       const processingTime = Date.now() - startTime;
       
-      console.log(`✅ 自动存储完成: 用户${userId}, 文件:${filePath}, 大小:${fileSize}字节, 耗时:${processingTime}ms`);
+      console.log(`[SUCCESS] 自动存储完成: 用户${userId}, 文件:${filePath}, 大小:${fileSize}字节, 耗时:${processingTime}ms`);
       
       return {
         success: true,

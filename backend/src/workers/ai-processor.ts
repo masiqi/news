@@ -161,9 +161,9 @@ export default {
             });
             
             if (autoStorageResult.success) {
-              console.log(`✅ 自动存储成功: ${autoStorageResult.filePath} (${autoStorageResult.fileSize}字节)`);
+              console.log(`[SUCCESS] 自动存储成功: ${autoStorageResult.filePath} (${autoStorageResult.fileSize}字节)`);
             } else {
-              console.warn(`⚠️ 自动存储失败: ${autoStorageResult.error}`);
+              console.warn(`[WARN] 自动存储失败: ${autoStorageResult.error}`);
             }
             
           } catch (storageError) {

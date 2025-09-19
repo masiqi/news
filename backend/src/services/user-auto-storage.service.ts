@@ -97,7 +97,7 @@ export class UserAutoStorageService {
         .returning()
         .get();
 
-      console.log(`✅ 为用户${userId}创建默认自动存储配置`);
+      console.log(`[SUCCESS] 为用户${userId}创建默认自动存储配置`);
       
       return {
         id: config.id,
@@ -133,7 +133,7 @@ export class UserAutoStorageService {
         .returning()
         .get();
 
-      console.log(`✅ 更新用户${userId}自动存储配置:`, updates);
+      console.log(`[SUCCESS] 更新用户${userId}自动存储配置:`, updates);
       
       return {
         id: updatedConfig.id,
@@ -231,7 +231,7 @@ export class UserAutoStorageService {
         })
         .run();
 
-      console.log(`📝 记录存储日志: 用户${params.userId}, 文件:${params.filePath}, 状态:${params.status}`);
+      console.log(`[PROMPT] 记录存储日志: 用户${params.userId}, 文件:${params.filePath}, 状态:${params.status}`);
     } catch (error) {
       console.error(`记录用户${params.userId}存储日志失败:`, error);
     }
@@ -283,7 +283,7 @@ export class UserAutoStorageService {
           .run();
       }
 
-      console.log(`📊 更新用户${userId}存储统计: +${fileSize}字节`);
+      console.log(`[STATS] 更新用户${userId}存储统计: +${fileSize}字节`);
     } catch (error) {
       console.error(`更新用户${userId}存储统计失败:`, error);
     }

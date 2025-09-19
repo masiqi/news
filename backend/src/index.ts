@@ -184,7 +184,7 @@ async function processRssFetch(sourceId: number, rssUrl: string, env: Cloudflare
             // 如果有链接，先尝试抓取完整的网页内容
             if (entry.link) {
               try {
-                console.log(`🌐 尝试抓取完整网页内容: ${entry.link}`);
+                console.log(`[WEB] 尝试抓取完整网页内容: ${entry.link}`);
                 
                 const response = await fetch(entry.link, {
                   headers: {
@@ -198,10 +198,10 @@ async function processRssFetch(sourceId: number, rssUrl: string, env: Cloudflare
                   const html = await response.text();
                   contentForAnalysis = html;
                   webContentFetched = true;
-                  console.log(`✅ 网页抓取成功，使用HTML内容进行分析，长度: ${html.length} 字符`);
+                  console.log(`[SUCCESS] 网页抓取成功，使用HTML内容进行分析，长度: ${html.length} 字符`);
                 }
               } catch (webError) {
-                console.error(`❌ 网页内容抓取失败，将使用RSS原始内容:`, webError);
+                console.error(`[ERROR] 网页内容抓取失败，将使用RSS原始内容:`, webError);
               }
             }
             
@@ -217,7 +217,7 @@ async function processRssFetch(sourceId: number, rssUrl: string, env: Cloudflare
               env
             });
             
-            console.log(`✅ 条目 ${rssEntry.id} 统一LLM分析完成`);
+            console.log(`[SUCCESS] 条目 ${rssEntry.id} 统一LLM分析完成`);
             
           } catch (analysisError) {
             console.error(`条目 ${rssEntry.id} LLM分析失败:`, analysisError);

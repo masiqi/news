@@ -130,9 +130,9 @@ tagsRoutes.get("/topics", requireAuth, async (c) => {
   const db = drizzle(c.env.DB);
 
   try {
-    console.log(`🔍 获取用户主题列表: userId=${userId}, limit=${limit}, offset=${offset}`);
+    console.log(`[PARSE] 获取用户主题列表: userId=${userId}, limit=${limit}, offset=${offset}`);
     const topics = await tagAggregationService.getUserTopics(userId, limit, offset, db);
-    console.log(`✅ 成功获取主题列表: ${topics.length} 个主题`);
+    console.log(`[SUCCESS] 成功获取主题列表: ${topics.length} 个主题`);
     
     return c.json({
       success: true,
@@ -144,8 +144,8 @@ tagsRoutes.get("/topics", requireAuth, async (c) => {
       }
     });
   } catch (error) {
-    console.error('❌ 获取用户主题失败:', error);
-    console.error('❌ 错误详情:', {
+    console.error('[ERROR] 获取用户主题失败:', error);
+    console.error('[ERROR] 错误详情:', {
       message: error instanceof Error ? error.message : '未知错误',
       stack: error instanceof Error ? error.stack : undefined,
       userId,

@@ -213,23 +213,23 @@ export class RssSchedulerService {
           
           console.log(`准备发送队列消息:`, message);
           await this.rssQueue.send(message);
-          console.log(`✅ 已成功发送手动触发的RSS源 ${sourceId} 获取任务到队列`);
+          console.log(`[SUCCESS] 已成功发送手动触发的RSS源 ${sourceId} 获取任务到队列`);
         } catch (queueError) {
-          console.error('❌ 发送队列消息失败:', queueError);
+          console.error('[ERROR] 发送队列消息失败:', queueError);
           return false;
         }
       } else {
-        console.warn('⚠️ RSS队列未配置，无法发送获取任务');
+        console.warn('[WARN] RSS队列未配置，无法发送获取任务');
         // 仍然更新数据库状态，但提示队列未配置
       }
       
       // 更新源的状态为正在获取
       await this.updateSourceFetchStatus(sourceId, new Date(), source.fetchFailureCount || 0, null);
-      console.log(`✅ 已更新RSS源 ${sourceId} 的获取状态`);
+      console.log(`[SUCCESS] 已更新RSS源 ${sourceId} 的获取状态`);
       
       return true;
     } catch (error) {
-      console.error('❌ 手动触发RSS源获取失败:', error);
+      console.error('[ERROR] 手动触发RSS源获取失败:', error);
       return false;
     }
   }

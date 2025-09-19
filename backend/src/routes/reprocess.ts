@@ -9,37 +9,49 @@ const reprocessRoutes = new Hono<{ Bindings: CloudflareBindings }>();
 
 // AI重新处理内容 - 使用统一LLM服务
 reprocessRoutes.post("/", async (c) => {
-  const entryId = parseInt(c.req.query('id'));
+  // 尝试从查询参数获取ID
+  const entryId = parseInt(c.req.query('id') || '');
   
-  if (isNaN(entryId)) {
-    return c.json({ error: "无效的内容ID" }, 400);
+  // 如果查询参数没有ID, 尝试从请求体获取
+  let bodyEntryId;
+  try {
+    const body = await c.req.json();
+    bodyEntryId = body.id;
+  } catch (e) {
+    // 如果解析JSON失败, 忽略错误
+  }
+  
+  const finalEntryId = entryId || bodyEntryId;
+  
+  if (isNaN(finalEntryId)) {
+    return c.json({ error: "Invalid content ID" }, 400);
   }
 
   const db = drizzle(c.env.DB);
   
   try {
-    console.log(`开始AI重新处理内容，条目ID: ${entryId}`);
+    console.log('[PROCESS] Starting AI reprocessing, entry ID: ' + finalEntryId);
 
     // 获取RSS条目信息
     const rssEntry = await db
       .select()
       .from(rssEntries)
-      .where(eq(rssEntries.id, entryId))
+      .where(eq(rssEntries.id, finalEntryId))
       .get();
 
     if (!rssEntry) {
-      return c.json({ error: "内容条目不存在" }, 404);
+      return c.json({ error: "Content entry not found" }, 404);
     }
 
-    console.log(`找到RSS条目: ${rssEntry.title}`);
+    console.log(`Found RSS entry: ${rssEntry.title}`);
 
     let contentForAnalysis = rssEntry.content;
     let webContentFetched = false;
 
-    // 如果有链接，先尝试抓取完整的网页内容
+    // 如果有链接, 先尝试抓取完整的网页内容
     if (rssEntry.link) {
       try {
-        console.log(`🌐 尝试抓取完整网页内容: ${rssEntry.link}`);
+        console.log(`[WEB] Attempting to fetch full web content: ${rssEntry.link}`);
         
         const response = await fetch(rssEntry.link, {
           headers: {
@@ -55,32 +67,32 @@ reprocessRoutes.post("/", async (c) => {
         }
 
         const html = await response.text();
-        console.log(`✅ 网页抓取成功，HTML长度: ${html.length} 字符`);
-        console.log(`📄 原始HTML前500字符: ${html.substring(0, 500)}`);
+        console.log(`[SUCCESS] Web fetch successful, HTML length: ${html.length} chars`);
+        console.log(`[CONTENT] Original HTML first 500 chars: ${html.substring(0, 500)}`);
         
         contentForAnalysis = html;
         webContentFetched = true;
         
-        console.log(`✅ 使用原始HTML进行AI分析，长度: ${contentForAnalysis.length} 字符`);
+        console.log(`[SUCCESS] Using original HTML for AI analysis, length: ${contentForAnalysis.length} chars`);
         
       } catch (webError) {
-        console.error(`❌ 网页内容抓取失败，将使用RSS原始内容:`, webError);
-        console.log(`📄 将使用RSS原始内容，长度: ${rssEntry.content.length} 字符`);
+        console.error(`[ERROR] Web content fetch failed, using RSS original content:`, webError);
+        console.log(`[CONTENT] will use RSS original content, length: ${rssEntry.content.length} chars`);
       }
     } else {
-      console.log(`⚠️  RSS条目没有链接，将使用RSS原始内容`);
+      console.log(`[WARN]  RSS entry has no link, will use RSS original content`);
     }
 
     // 检查API Key
     const apiKey = c.env.ZHIPUAI_API_KEY;
     if (!apiKey) {
-      return c.json({ error: "智谱AI API Key未配置" }, 500);
+      return c.json({ error: "ZhipuAI API Key not configured" }, 500);
     }
 
     // 使用统一LLM服务进行分析
-    console.log(`=== 开始统一LLM分析，条目ID: ${entryId} ===`);
+    console.log(`=== Starting unified LLM analysis, entry ID: ${finalEntryId} ===`);
     const result = await UnifiedLLMService.analyzeAndSave({
-      entryId: entryId,
+      entryId: finalEntryId,
       title: rssEntry.title,
       content: contentForAnalysis,
       link: rssEntry.link,
@@ -90,35 +102,35 @@ reprocessRoutes.post("/", async (c) => {
       env: c.env
     });
 
-    console.log(`🎉 统一LLM重新处理完成，条目ID: ${entryId}`);
+    console.log(`[SUCCESS] Unified LLM reprocessing completed, entry ID: ${finalEntryId}`);
 
     // 触发标签聚合处理
     try {
-      console.log(`🏷️ 开始标签聚合处理，条目ID: ${entryId}`);
+      console.log(`[TAG] Starting tag aggregation processing, entry ID: ${finalEntryId}`);
       
       // 获取刚创建或更新的processed_contents记录
       const processedRecord = await db
         .select({ id: processedContents.id })
         .from(processedContents)
-        .where(eq(processedContents.entryId, entryId))
+        .where(eq(processedContents.entryId, finalEntryId))
         .limit(1)
         .get();
       
       if (processedRecord) {
         await tagAggregationService.processContentTags(processedRecord.id, db);
-        console.log(`✅ 标签聚合处理完成，processedContentId: ${processedRecord.id}`);
+        console.log(`[SUCCESS] Tag aggregation processing completed, processedContentId: ${processedRecord.id}`);
       }
       
     } catch (tagError) {
-      console.error('❌ 标签聚合处理失败:', tagError);
-      // 标签聚合失败不影响主要功能，只记录错误
+      console.error('[ERROR] tag aggregation processing failed:', tagError);
+      // 标签聚合失败不影响主要功能, 只记录错误
     }
 
     return c.json({
       success: true,
-      message: "AI重新分析成功",
+      message: "AI reanalysis successful",
       data: {
-        entryId,
+        entryId: finalEntryId,
         topics: result.topics,
         keywords: result.keywords,
         sentiment: result.sentiment,
@@ -127,12 +139,12 @@ reprocessRoutes.post("/", async (c) => {
         extractedContent: result.extractedContent,
         processingTime: result.processingTime,
         modelUsed: result.modelUsed,
-        wordCounts: result.wordCounts // 新增字数统计
+        wordCounts: result.wordCounts // new word count stats
       }
     });
 
   } catch (error) {
-    console.error('AI重新处理失败，条目ID:', entryId, '错误:', error);
+    console.error('AI reprocessing failed, entry ID:', finalEntryId, 'error:', error);
     
     // 更新失败状态
     try {
@@ -140,7 +152,7 @@ reprocessRoutes.post("/", async (c) => {
       const currentEntry = await db
         .select({ failureCount: rssEntries.failureCount })
         .from(rssEntries)
-        .where(eq(rssEntries.id, entryId))
+        .where(eq(rssEntries.id, finalEntryId))
         .get();
       
       const newFailureCount = (currentEntry?.failureCount || 0) + 1;
@@ -148,17 +160,17 @@ reprocessRoutes.post("/", async (c) => {
       await db.update(rssEntries)
         .set({
           failureCount: newFailureCount,
-          errorMessage: error instanceof Error ? error.message : 'AI重新处理失败',
+          errorMessage: error instanceof Error ? error.message : 'AI reprocessing failed',
           processedAt: new Date()
         })
-        .where(eq(rssEntries.id, entryId));
+        .where(eq(rssEntries.id, finalEntryId));
     } catch (updateError) {
-      console.error('更新失败状态也失败:', updateError);
+      console.error('Failed to update failure status:', updateError);
     }
     
     return c.json({ 
-      error: "AI重新处理失败", 
-      details: error instanceof Error ? error.message : '未知错误'
+      error: "AI reprocessing failed", 
+      details: error instanceof Error ? error.message : 'unknown error'
     }, 500);
   }
 });
