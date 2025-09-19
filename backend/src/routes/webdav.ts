@@ -54,10 +54,8 @@ webdavRoutes.on('PROPFIND', '/*', async (c) => {
     // 如果路径不存在，创建用户目录结构
     const pathExists = await webdavService.exists(authUser, actualPath);
     if (!pathExists && actualPath === '/') {
-      console.log(`[WEBDAV] 用户目录不存在，创建默认目录结构`);
-      await webdavService.createDirectory(authUser, '/documents');
-      await webdavService.createDirectory(authUser, '/notes');
-      await webdavService.createDirectory(authUser, '/exports');
+      console.log(`[WEBDAV] 用户目录不存在，创建默认news目录`);
+      await webdavService.createDirectory(authUser, '/news');
       await webdavService.createDirectory(authUser, '/');
     } else if (!pathExists) {
       console.log(`[WEBDAV] 路径不存在: ${actualPath}`);
@@ -137,11 +135,9 @@ webdavRoutes.get("/*", async (c) => {
     // 如果路径不存在，检查是否需要创建用户目录
     const pathExists = await webdavService.exists(authUser, actualPath);
     if (!pathExists && actualPath === '/') {
-      console.log(`[WEBDAV] 用户目录不存在，创建默认目录: user-${authUser.id}/`);
+      console.log(`[WEBDAV] 用户目录不存在，创建默认news目录: user-${authUser.id}/`);
       // 创建用户默认目录结构
-      await webdavService.createDirectory(authUser, '/documents');
-      await webdavService.createDirectory(authUser, '/notes');
-      await webdavService.createDirectory(authUser, '/exports');
+      await webdavService.createDirectory(authUser, '/news');
       // 创建根目录标记
       await webdavService.createDirectory(authUser, '/');
     }

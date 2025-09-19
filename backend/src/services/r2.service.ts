@@ -21,16 +21,9 @@ export class R2Service {
       const userDirPath = `user-${userId}/.gitkeep`;
       await this.r2Bucket.put(userDirPath, new Uint8Array());
       
-      // 创建用户的默认子目录结构
-      const defaultDirs = ['sources', 'notes', 'exports'];
-      for (const dir of defaultDirs) {
-        const dirPath = `user-${userId}/${dir}/.gitkeep`;
-        await this.r2Bucket.put(dirPath, new Uint8Array());
-      }
-      
-      // 创建配置目录
-      const configDirPath = `user-${userId}/config/.gitkeep`;
-      await this.r2Bucket.put(configDirPath, new Uint8Array());
+      // 创建用户的默认news目录
+      const newsDirPath = `user-${userId}/news/.gitkeep`;
+      await this.r2Bucket.put(newsDirPath, new Uint8Array());
       
       console.log(`[SUCCESS] 用户${userId}的R2存储目录创建成功，路径：user-${userId}/`);
       return true;

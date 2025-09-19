@@ -6,7 +6,7 @@
   "r2_buckets": [
     {
       "binding": "R2_BUCKET",
-      "bucket_name": "news-storage"
+      "bucket_name": "news"
     }
   ],
   "vars": {
@@ -46,5 +46,51 @@
         "queue": "AI_PROCESSOR_QUEUE"
       }
     ]
+  },
+  "env": {
+    "dev": {
+      "r2_buckets": [
+        {
+          "binding": "R2_BUCKET",
+          "bucket_name": "news",
+          "local_path": "./.r2"
+        }
+      ],
+      "vars": {
+        "JWT_SECRET": "development_jwt_secret_key_for_local_testing_only",
+        "ADMIN_USERNAME": "admin",
+        "ADMIN_PASSWORD": "admin123"
+      },
+      "ai": {
+        "binding": "AI"
+      },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "news-db",
+          "database_id": "local"
+        }
+      ],
+      "queues": {
+        "producers": [
+          {
+            "binding": "RSS_FETCHER_QUEUE",
+            "queue": "RSS_FETCHER_QUEUE"
+          },
+          {
+            "binding": "AI_PROCESSOR_QUEUE",
+            "queue": "AI_PROCESSOR_QUEUE"
+          }
+        ],
+        "consumers": [
+          {
+            "queue": "RSS_FETCHER_QUEUE"
+          },
+          {
+            "queue": "AI_PROCESSOR_QUEUE"
+          }
+        ]
+      }
+    }
   }
 }
