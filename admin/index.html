@@ -50,6 +50,28 @@
     </style>
     <!-- 引入模块化组件 -->
     <script>
+        // 初始化后端请求工具，支持自定义后端地址
+        (function initializeBackendUrlHelpers() {
+            if (typeof window === 'undefined') {
+                return;
+            }
+            const defaultBackendBase = window.location ? window.location.origin : '';
+            if (!window.ADMIN_BACKEND_BASE_URL) {
+                window.ADMIN_BACKEND_BASE_URL = defaultBackendBase;
+            }
+            window.buildAdminBackendUrl = function(path = '') {
+                if (!path) {
+                    return window.ADMIN_BACKEND_BASE_URL || '';
+                }
+                if (/^https?:\/\//i.test(path)) {
+                    return path;
+                }
+                const base = (window.ADMIN_BACKEND_BASE_URL || '').replace(/\/$/, '');
+                const normalizedPath = path.startsWith('/') ? path : '/' + path;
+                return base ? base + normalizedPath : normalizedPath;
+            };
+        })();
+
         // 确保 AMIS 库加载完成后再加载其他组件
         function loadComponents() {
             if (typeof amis !== 'undefined') {
@@ -61,7 +83,8 @@
                     '/components/dashboard.js',
                     '/components/user-management.js',
                     '/components/rss-management.js',
-                    '/components/content-management.js'
+                    '/components/content-management.js',
+                    '/components/system-monitor.js'
                 ];
                 
                 let loadedCount = 0;
@@ -332,6 +355,11 @@
                       ? window.ContentComponents.getContentPageConfig()
                       : getContentPageConfig();
                     break;
+                case '/monitor':
+                    schema = (window.SystemMonitor && window.SystemMonitor.createMonitorPage)
+                      ? window.SystemMonitor.createMonitorPage()
+                      : getMonitorPageConfig();
+                    break;
                 default:
                     schema = getHomePageConfig();
             }
@@ -372,6 +400,22 @@
                     type: 'alert',
                     level: 'info',
                     body: '内容管理模块加载中，请稍后重试...'
+                }
+            };
+        }
+
+        // 系统监控页面占位：如模块已加载则委托给模块
+        function getMonitorPageConfig() {
+            if (window.SystemMonitor && typeof window.SystemMonitor.createMonitorPage === 'function') {
+                return window.SystemMonitor.createMonitorPage();
+            }
+            return {
+                type: 'page',
+                title: '系统监控',
+                body: {
+                    type: 'alert',
+                    level: 'info',
+                    body: '系统监控模块加载中，请稍后重试...'
                 }
             };
         }

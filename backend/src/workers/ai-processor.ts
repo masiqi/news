@@ -11,6 +11,9 @@ import { AIConfigService } from '../services/config/ai-config.service';
 import { ContentAnalyzerService } from '../services/ai/content-analyzer';
 import { MarkdownGenerator } from '../services/ai/markdown-generator';
 import { AutoMarkdownStorageService } from '../services/auto-markdown-storage.service';
+import { SharedContentPoolService } from '../services/shared-content-pool.service';
+import { ContentDistributionService } from '../services/content-distribution.service';
+import { R2Service } from '../services/r2.service';
 import { QueueMessage, ProcessingResult } from '../services/queue/types';
 
 // 最大失败重试次数
@@ -40,6 +43,13 @@ export default {
     const autoStorageService = new AutoMarkdownStorageService(env);
     
     const consumer = new QueueConsumerService(env.AI_PROCESSOR_QUEUE);
+    
+    // 初始化共享内容池服务
+    const r2Service = new R2Service(env);
+    const sharedContentPool = new SharedContentPoolService(db, r2Service);
+    
+    // 初始化内容分发服务
+    const contentDistributionService = new ContentDistributionService(sharedContentPool, r2Service);
     
     await consumer.process(async (message: QueueMessage) => {
       const startTime = Date.now();
@@ -139,11 +149,49 @@ export default {
         const totalProcessingTime = Date.now() - startTime;
         console.log(`完整LLM处理流程完成，总耗时: ${totalProcessingTime}ms`);
         
-        // 自动存储Markdown到用户R2空间
+        // 自动存储Markdown到共享内容池和用户空间
         if (entryId) {
+          let contentHash: string | null = null;
+          let processedContentId: number | null = null;
+          
           try {
-            console.log(`开始自动存储Markdown到用户${userId}的R2空间...`);
+            console.log(`开始自动存储Markdown到共享内容池和用户${userId}的空间...`);
             
+            // 计算内容哈希
+            contentHash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(markdownContent))
+              .then(hash => Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join(''));
+            
+            console.log(`内容哈希计算完成: ${contentHash}`);
+            
+            // 1. 存储到共享内容池
+            const sharedContentMetadata = {
+              title: metadata?.title || analysisResult.title,
+              source: metadata?.sourceName || '未知来源',
+              publishedAt: metadata?.publishedAt ? new Date(metadata.publishedAt) : new Date(),
+              processingTime: analysisResult.processingTime,
+              modelUsed: analysisResult.modelUsed || 'glm-4.5-flash',
+              wordCount: analysisResult.wordCount || 0,
+              entryId: parseInt(entryId)
+            };
+            
+            const sharedContent = await sharedContentPool.storeToSharedPool(
+              contentHash,
+              markdownContent,
+              sharedContentMetadata
+            );
+            
+            console.log(`[SUCCESS] 共享内容存储成功: ${sharedContent.contentHash} (${sharedContent.fileSize}字节)`);
+            
+            // 2. 为用户创建副本
+            const userCopy = await sharedContentPool.createUserCopy(
+              userId,
+              parseInt(entryId),
+              contentHash
+            );
+            
+            console.log(`[SUCCESS] 用户副本创建成功: ${userId} - ${entryId} (${userCopy.fileSize}字节)`);
+            
+            // 3. 同时调用原有的自动存储服务以保持兼容性（未来可移除）
             const autoStorageResult = await autoStorageService.processAndStoreMarkdown({
               userId,
               sourceId,
@@ -156,19 +204,73 @@ export default {
                 entryId,
                 title: metadata?.title || analysisResult.title,
                 sourceName: metadata?.sourceName,
-                processedAt: new Date()
+                processedAt: new Date(),
+                contentHash: contentHash,
+                storagePath: userCopy.userPath
               }
             });
             
             if (autoStorageResult.success) {
-              console.log(`[SUCCESS] 自动存储成功: ${autoStorageResult.filePath} (${autoStorageResult.fileSize}字节)`);
+              console.log(`[SUCCESS] 兼容性存储成功: ${autoStorageResult.filePath} (${autoStorageResult.fileSize}字节)`);
             } else {
-              console.warn(`[WARN] 自动存储失败: ${autoStorageResult.error}`);
+              console.warn(`[WARN] 兼容性存储失败: ${autoStorageResult.error}`);
             }
             
           } catch (storageError) {
-            console.error('自动存储过程中出错:', storageError);
-            // 自动存储失败不影响主要处理流程
+            console.error('分层存储过程中出错:', storageError);
+            // 分层存储失败不影响主要处理流程
+          }
+          
+          // 4. 智能内容分发 - 将内容分发给相关用户
+          if (contentHash) {
+            try {
+              console.log(`[DISTRIBUTION] 开始智能内容分发: 内容哈希 ${contentHash}`);
+              
+              // 获取或创建processedContentId（如果需要）
+              // 这里简化处理，实际应该从数据库获取
+              processedContentId = parseInt(entryId); // 临时使用entryId作为processedContentId
+              
+              // 构建内容特征
+              const contentFeatures = {
+                topics: analysisResult.categories || [],
+                keywords: analysisResult.keywords || [],
+                importanceScore: analysisResult.importance || 0.7,
+                source: metadata?.sourceName || '未知来源',
+                contentType: 'news' as const
+              };
+              
+              // 执行智能内容分发
+              const distributionResults = await contentDistributionService.distributeContent(
+                contentHash,
+                processedContentId,
+                parseInt(entryId),
+                contentFeatures
+              );
+              
+              const successCount = distributionResults.filter(r => r.success).length;
+              const totalCount = distributionResults.length;
+              
+              console.log(`[DISTRIBUTION] 智能内容分发完成: 成功 ${successCount}/${totalCount} 用户`);
+              
+              if (totalCount > 0) {
+                console.log(`[DISTRIBUTION] 分发统计:`);
+                console.log(`[DISTRIBUTION]   - 成功率: ${((successCount / totalCount) * 100).toFixed(1)}%`);
+                console.log(`[DISTRIBUTION]   - 平均处理时间: ${(distributionResults.reduce((sum, r) => sum + r.processingTime, 0) / totalCount).toFixed(0)}ms`);
+                
+                // 记录分发失败的详情
+                const failedDistributions = distributionResults.filter(r => !r.success);
+                if (failedDistributions.length > 0) {
+                  console.warn(`[DISTRIBUTION] 分发失败详情:`);
+                  failedDistributions.forEach(fd => {
+                    console.warn(`[DISTRIBUTION]   - 用户 ${fd.target.userId}: ${fd.error}`);
+                  });
+                }
+              }
+              
+            } catch (distributionError) {
+              console.error('智能内容分发失败:', distributionError);
+              // 分发失败不影响主要处理流程
+            }
           }
         }
         

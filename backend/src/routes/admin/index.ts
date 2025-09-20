@@ -1,6 +1,8 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import adminRecommendedSourcesRoutes from './recommended-sources';
+import adminRssManagementRoutes from './rss-management';
+import adminSimpleRssRoutes from './simple-rss';
 import adminCategoriesRoutes from './categories';
 import adminTagsRoutes from './tags';
 import adminStatisticsRoutes from './statistics';
@@ -34,6 +36,8 @@ adminRoutes.get('/health', (c) => {
 
 // 挂载子路由
 adminRoutes.route('/recommended-sources', adminRecommendedSourcesRoutes);
+adminRoutes.route('/rss', adminRssManagementRoutes);
+adminRoutes.route('/simple-rss', adminSimpleRssRoutes);
 adminRoutes.route('/categories', adminCategoriesRoutes);
 adminRoutes.route('/tags', adminTagsRoutes);
 adminRoutes.route('/statistics', adminStatisticsRoutes);
@@ -227,6 +231,15 @@ adminRoutes.get('/', (c) => {
       'DELETE /recommended-sources/:id': '删除推荐源',
       'POST /recommended-sources/:id/validate': '验证推荐源',
       'GET /recommended-sources/statistics': '获取推荐源统计',
+      // RSS源管理API
+      'GET /rss/sources': '获取RSS源列表（分页、搜索、筛选）',
+      'GET /rss/sources/:id': '获取RSS源详情',
+      'POST /rss/sources': '创建RSS源（自动验证RSS有效性）',
+      'PUT /rss/sources/:id': '更新RSS源',
+      'DELETE /rss/sources/:id': '删除RSS源及相关数据',
+      'POST /rss/sources/:id/test': '测试RSS源连接',
+      'POST /rss/sources/:id/reset-failures': '重置RSS源失败计数',
+      'GET /rss/statistics': '获取RSS源统计信息',
       'GET /categories': '获取分类列表',
       'POST /categories': '创建分类',
       'GET /categories/:id': '获取分类详情',

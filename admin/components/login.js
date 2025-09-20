@@ -5,6 +5,13 @@
 /**
  * 登录页面配置
  */
+function resolveLoginBackendUrl(path) {
+    if (typeof window !== 'undefined' && typeof window.buildAdminBackendUrl === 'function') {
+        return window.buildAdminBackendUrl(path);
+    }
+    return path;
+}
+
 function getLoginPageConfig() {
     return {
         type: 'page',
@@ -19,7 +26,7 @@ function getLoginPageConfig() {
             },
             api: {
                 method: 'post',
-                url: 'http://localhost:8787/auth/admin-login',
+                url: resolveLoginBackendUrl('/auth/admin-login'),
                 adaptor: function(payload) {
                     // 处理登录响应
                     if (payload.message === '管理员登录成功') {

@@ -1499,12 +1499,99 @@ export const glmMonitoring = sqliteTable('glm_monitoring', {
   timestampIdx: index('idx_glm_monitoring_timestamp').on(table.timestamp),
 }));
 
+// 内容URL索引表 - 用于基于URL的内容去重
+export const contentUrlIndex = sqliteTable('content_url_index', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  url: text('url').notNull(), // 内容URL
+  entryId: integer('entry_id').notNull().references(() => rssEntries.id, { onDelete: 'cascade' }), // 对应的RSS条目ID
+  userId: text('user_id').notNull(), // 用户ID（字符串格式）
+  sourceId: integer('source_id').references(() => sources.id, { onDelete: 'set null' }), // 可选：RSS源ID
+  title: text('title'), // 可选：内容标题
+  publishedAt: integer('published_at', { mode: 'timestamp' }), // 可选：发布时间
+  contentHash: text('content_hash'), // 可选：内容哈希值（用于未来扩展）
+  lastAccessedAt: integer('last_accessed_at', { mode: 'timestamp' }).notNull().default(sql`CURRENT_TIMESTAMP`), // 最后访问时间
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`CURRENT_TIMESTAMP`),
+  metadata: text('metadata'), // JSON格式存储的额外元数据
+}, (table) => ({
+  urlIdx: uniqueIndex('unq_content_url_index_url').on(table.url), // URL唯一索引
+  entryIdIdx: index('idx_content_url_index_entry_id').on(table.entryId), // 条目ID索引
+  userIdIdx: index('idx_content_url_index_user_id').on(table.userId), // 用户ID索引
+  sourceIdIdx: index('idx_content_url_index_source_id').on(table.sourceId), // 源ID索引
+  createdAtIdx: index('idx_content_url_index_created_at').on(table.createdAt), // 创建时间索引
+  lastAccessedAtIdx: index('idx_content_url_index_last_accessed_at').on(table.lastAccessedAt), // 最后访问时间索引
+}));
+
+// 共享内容库表 - 存储可共享的内容
+export const contentLibrary = sqliteTable('content_library', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  contentHash: text('content_hash').notNull().unique(), // 内容哈希，唯一标识
+  storagePath: text('storage_path').notNull(), // R2存储路径
+  metadata: text('metadata').notNull(), // JSON格式的内容元数据
+  referenceCount: integer('reference_count').notNull().default(0), // 引用计数
+  fileSize: integer('file_size').notNull(), // 文件大小（字节）
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`CURRENT_TIMESTAMP`),
+  lastAccessedAt: integer('last_accessed_at', { mode: 'timestamp' }).notNull().default(sql`CURRENT_TIMESTAMP`),
+  compressionRatio: real('compression_ratio'), // 压缩比率（未来扩展）
+  tags: text('tags'), // 内容标签（JSON数组格式，未来扩展）
+}, (table) => ({
+  contentHashIdx: uniqueIndex('unq_content_library_content_hash').on(table.contentHash), // 内容哈希唯一索引
+  storagePathIdx: index('idx_content_library_storage_path').on(table.storagePath), // 存储路径索引
+  referenceCountIdx: index('idx_content_library_reference_count').on(table.referenceCount), // 引用计数索引
+  createdAtIdx: index('idx_content_library_created_at').on(table.createdAt), // 创建时间索引
+  lastAccessedAtIdx: index('idx_content_library_last_accessed_at').on(table.lastAccessedAt), // 最后访问时间索引
+}));
+
+// 用户存储引用表 - 记录用户与共享内容的映射关系
+export const userStorageRefs = sqliteTable('user_storage_refs', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  userId: text('user_id').notNull(), // 用户ID
+  entryId: integer('entry_id').notNull().references(() => rssEntries.id, { onDelete: 'cascade' }), // RSS条目ID
+  contentHash: text('content_hash').notNull(), // 原始内容哈希
+  userPath: text('user_path').notNull(), // 用户存储路径
+  isModified: integer('is_modified', { mode: 'boolean' }).notNull().default(false), // 是否已被用户修改
+  currentHash: text('current_hash'), // 当前内容哈希（修改后）
+  modifiedAt: integer('modified_at', { mode: 'timestamp' }), // 修改时间
+  fileSize: integer('file_size').notNull(), // 当前文件大小
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`CURRENT_TIMESTAMP`),
+  lastAccessedAt: integer('last_accessed_at', { mode: 'timestamp' }).notNull().default(sql`CURRENT_TIMESTAMP`),
+  accessCount: integer('access_count').notNull().default(0), // 访问次数统计
+}, (table) => ({
+  userIdEntryIdIdx: uniqueIndex('unq_user_storage_refs_user_entry').on(table.userId, table.entryId), // 用户+条目唯一索引
+  userIdIdx: index('idx_user_storage_refs_user_id').on(table.userId), // 用户ID索引
+  entryIdIdx: index('idx_user_storage_refs_entry_id').on(table.entryId), // 条目ID索引
+  contentHashIdx: index('idx_user_storage_refs_content_hash').on(table.contentHash), // 内容哈希索引
+  isModifiedIdx: index('idx_user_storage_refs_is_modified').on(table.isModified), // 修改状态索引
+  createdAtIdx: index('idx_user_storage_refs_created_at').on(table.createdAt), // 创建时间索引
+  lastAccessedAtIdx: index('idx_user_storage_refs_last_accessed_at').on(table.lastAccessedAt), // 最后访问时间索引
+}));
+
+// 存储统计表 - 用于存储空间分析和优化
+export const storageStats = sqliteTable('storage_stats', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  date: text('date').notNull(), // 统计日期 (YYYY-MM-DD)
+  totalSharedFiles: integer('total_shared_files').notNull().default(0), // 共享文件总数
+  totalUserFiles: integer('total_user_files').notNull().default(0), // 用户文件总数
+  totalStorageUsed: integer('total_storage_used').notNull().default(0), // 总存储使用量（字节）
+  sharedContentSavings: integer('shared_content_savings').notNull().default(0), // 共享内容节省空间
+  compressionRatio: real('compression_ratio').notNull().default(0), // 压缩比率
+  orphanedFilesCleaned: integer('orphaned_files_cleaned').notNull().default(0), // 清理的孤立文件数
+  spaceFreed: integer('space_freed').notNull().default(0), // 释放的空间
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`CURRENT_TIMESTAMP`),
+}, (table) => ({
+  dateIdx: uniqueIndex('unq_storage_stats_date').on(table.date), // 日期唯一索引
+  createdAtIdx: index('idx_storage_stats_created_at').on(table.createdAt), // 创建时间索引
+}));
+
 // Export GLM types
 export type GLMConfig = typeof glmConfigs.$inferSelect;
 export type GLMUsageStats = typeof glmUsageStats.$inferSelect;
 export type GLMRequestQueue = typeof glmRequestQueue.$inferSelect;
 export type GLMCallLogs = typeof glmCallLogs.$inferSelect;
 export type GLMMonitoring = typeof glmMonitoring.$inferSelect;
+export type ContentUrlIndex = typeof contentUrlIndex.$inferSelect;
+export type ContentLibrary = typeof contentLibrary.$inferSelect;
+export type UserStorageRefs = typeof userStorageRefs.$inferSelect;
+export type StorageStats = typeof storageStats.$inferSelect;
 
 export const glmSchema = {
   glmConfigs,
@@ -1518,6 +1605,11 @@ export const glmSchema = {
 export const schema = {
   users,
   sources,
+  rssEntries,
+  contentUrlIndex,
+  contentLibrary,
+  userStorageRefs,
+  storageStats,
   processedContents,
   userR2Access,
   userDirectoryQuotas,

@@ -3,7 +3,9 @@
 
 import { Hono } from "hono";
 import { webdavAuthMiddleware, getWebDAVUser } from "../middleware/webdav-auth.middleware";
+import { webDAVEditDetection } from "../middleware/webdav-edit-detection.middleware";
 import { WebDAVService } from "../services/webdav.service";
+import { UserEditIsolationService } from "../services/user-edit-isolation.service";
 import { WebDAVResponseFormatter } from "../utils/webdav-formatter";
 import type { WebDAVAuthUser } from "../middleware/webdav-auth.middleware";
 
@@ -25,6 +27,14 @@ webdavRoutes.use("*", async (c, next) => {
 
 // 应用认证中间件到所有WebDAV路由
 webdavRoutes.use("*", webdavAuthMiddleware);
+
+// 应用编辑检测中间件到所有WebDAV路由
+webdavRoutes.use("*", async (c, next) => {
+  const isolationService = new UserEditIsolationService(c.env.DB, c.env);
+  return webDAVEditDetection({
+    isolationService
+  })(c, next);
+});
 
 /**
  * PROPFIND - 列出目录内容或获取文件/目录属性

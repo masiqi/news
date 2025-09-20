@@ -3,14 +3,25 @@
 // 队列消息格式
 export interface QueueMessage {
   id: string;
-  type: 'rss_fetch' | 'ai_process';
+  type: 'rss_fetch' | 'ai_process' | 'content_distribute';
   payload: {
-    sourceId: string;
-    userId: string;
-    url: string;
+    sourceId?: string;
+    userId?: string;
+    url?: string;
     title?: string;
     content?: string;
     metadata?: Record<string, any>;
+    // 内容分发专用字段
+    contentHash?: string;
+    processedContentId?: number;
+    entryId?: number;
+    contentFeatures?: {
+      topics: string[];
+      keywords: string[];
+      importanceScore: number;
+      source: string;
+      contentType: 'news' | 'analysis' | 'tutorial';
+    };
   };
   timestamp: Date;
   attempts: number;

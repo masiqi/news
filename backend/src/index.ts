@@ -24,6 +24,7 @@ import rssRoutes from "./routes/rss";
 import statusRoutes from "./routes/api-status";
 import monitoringRoutes from "./routes/monitoring";
 import aiRoutes from "./routes/ai";
+import systemMonitorRoutes from "./routes/system-monitor";
 // 暂时注释掉GLM路由，因为有导入错误
 // import glmRoutes from "./routes/glm";
 // 移除测试路由导入
@@ -80,14 +81,17 @@ app.route("/api/tags", tagsRoutes);
 // 注册管理员API路由
 app.route("/admin", adminRoutes);
 
+// 注册管理员访问控制API路由
+app.route("/api/admin", adminAccessRoutes);
+
+// 注册系统监控API路由
+app.route("/api/admin", systemMonitorRoutes);
+
 // 注册管理员Markdown管理路由
 app.route("/admin/markdown", adminMarkdownRoutes);
 
 // 注册用户访问控制API路由
 app.route("/api/user", userAccessRoutes);
-
-// 注册管理员访问控制API路由
-app.route("/api/admin", adminAccessRoutes);
 
 // 注册自动存储API路由
 app.route("/api", autoStorageRoutes);

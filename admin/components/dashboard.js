@@ -6,12 +6,19 @@
 /**
  * 首页配置
  */
+function resolveDashboardBackendUrl(path) {
+    if (typeof window !== 'undefined' && typeof window.buildAdminBackendUrl === 'function') {
+        return window.buildAdminBackendUrl(path);
+    }
+    return path;
+}
+
 function getHomePageConfig() {
     const dashboardBody = {
         type: 'service',
         api: {
             method: 'get',
-            url: 'http://localhost:8787/admin/dashboard/statistics',
+            url: resolveDashboardBackendUrl('/admin/dashboard/statistics'),
             headers: {
                 'Authorization': 'Bearer ' + localStorage.getItem('admin_token')
             }
@@ -85,7 +92,7 @@ function getHomePageConfig() {
                                 type: 'service',
                                 api: {
                                     method: 'get',
-                                    url: 'http://localhost:8787/admin/users/recent',
+                                    url: resolveDashboardBackendUrl('/admin/users/recent'),
                                     headers: {
                                         'Authorization': 'Bearer ' + localStorage.getItem('admin_token')
                                     }
@@ -126,7 +133,7 @@ function getHomePageConfig() {
                                 type: 'service',
                                 api: {
                                     method: 'get',
-                                    url: 'http://localhost:8787/admin/system/logs',
+                                    url: resolveDashboardBackendUrl('/admin/system/logs'),
                                     headers: {
                                         'Authorization': 'Bearer ' + localStorage.getItem('admin_token')
                                     }

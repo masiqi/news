@@ -10,8 +10,8 @@ function getRssSourcesPageConfig() {
     return createCrudPageConfig(
         'RSS源管理',
         {
-            statisticsApi: '/admin/statistics/overview',
-            listApi: '/admin/sources'
+            statisticsApi: '/admin/simple-rss/statistics',
+            listApi: '/admin/simple-rss/sources'
         },
         [
             {
@@ -68,17 +68,147 @@ function getRssSourcesPageConfig() {
             {
                 type: 'operation',
                 label: '操作',
-                width: 120,
+                width: 280,
                 buttons: [
                     {
-                        type: 'button',
-                        icon: 'fa fa-refresh',
-                        tooltip: '手动获取',
+                        type: 'button', 
+                        label: '', 
+                        icon: 'fa fa-eye', 
+                        tooltip: '查看详情', 
+                        level: 'link', 
+                        actionType: 'dialog',
+                        dialog: {
+                            title: 'RSS源详情',
+                            size: 'lg',
+                            body: {
+                                type: 'form',
+                                api: {
+                                    method: 'get',
+                                    url: '/admin/simple-rss/sources/${id}',
+                                    headers: {
+                                        'Authorization': 'Bearer ' + localStorage.getItem('admin_token')
+                                    }
+                                },
+                                body: [
+                                    {
+                                        type: 'static',
+                                        name: 'id',
+                                        label: 'ID'
+                                    },
+                                    {
+                                        type: 'static',
+                                        name: 'name',
+                                        label: '源名称'
+                                    },
+                                    {
+                                        type: 'static',
+                                        name: 'url',
+                                        label: 'RSS链接'
+                                    },
+                                    {
+                                        type: 'static',
+                                        name: 'description',
+                                        label: '描述'
+                                    },
+                                    {
+                                        type: 'static',
+                                        name: 'isPublic',
+                                        label: '公开状态',
+                                        tpl: '${isPublic ? "公开" : "私有"}'
+                                    },
+                                    {
+                                        type: 'static',
+                                        name: 'status',
+                                        label: '状态',
+                                        tpl: '${status === "active" ? "活跃" : "非活跃"}'
+                                    },
+                                    {
+                                        type: 'static',
+                                        name: 'fetchFailureCount',
+                                        label: '失败次数'
+                                    },
+                                    {
+                                        type: 'static',
+                                        name: 'lastFetchedAt',
+                                        label: '最后获取时间'
+                                    },
+                                    {
+                                        type: 'static',
+                                        name: 'createdAt',
+                                        label: '创建时间'
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    {
+                        type: 'button', 
+                        label: '', 
+                        icon: 'fa fa-edit', 
+                        tooltip: '编辑', 
+                        level: 'link', 
+                        actionType: 'dialog',
+                        dialog: getRssSourceEditDialogConfig()
+                    },
+                    {
+                        type: 'button', 
+                        label: '', 
+                        icon: 'fa fa-plug', 
+                        tooltip: '测试连接', 
+                        level: 'link', 
+                        actionType: 'ajax',
+                        confirmText: '确定要测试该RSS源的连接吗？',
+                        api: {
+                            method: 'post',
+                            url: '/admin/simple-rss/sources/${id}/test',
+                            headers: {
+                                'Authorization': 'Bearer ' + localStorage.getItem('admin_token')
+                            }
+                        }
+                    },
+                    {
+                        type: 'button', 
+                        label: '', 
+                        icon: 'fa fa-refresh', 
+                        tooltip: '手动获取', 
+                        level: 'link', 
                         actionType: 'ajax',
                         confirmText: '确定要立即获取该RSS源的内容吗？',
                         api: {
                             method: 'post',
                             url: '/sources/${id}/trigger-fetch',
+                            headers: {
+                                'Authorization': 'Bearer ' + localStorage.getItem('admin_token')
+                            }
+                        }
+                    },
+                    {
+                        type: 'button', 
+                        label: '', 
+                        icon: 'fa fa-undo', 
+                        tooltip: '重置失败计数', 
+                        level: 'link', 
+                        actionType: 'ajax',
+                        confirmText: '确定要重置该RSS源的失败计数吗？',
+                        api: {
+                            method: 'post',
+                            url: '/admin/simple-rss/sources/${id}/reset-failures',
+                            headers: {
+                                'Authorization': 'Bearer ' + localStorage.getItem('admin_token')
+                            }
+                        }
+                    },
+                    {
+                        type: 'button', 
+                        label: '', 
+                        icon: 'fa fa-trash', 
+                        tooltip: '删除', 
+                        level: 'link', 
+                        actionType: 'ajax',
+                        confirmText: '确定要删除该RSS源吗？删除后将无法恢复，相关数据也会被清理。',
+                        api: {
+                            method: 'delete',
+                            url: '/admin/simple-rss/sources/${id}',
                             headers: {
                                 'Authorization': 'Bearer ' + localStorage.getItem('admin_token')
                             }
@@ -101,6 +231,14 @@ function getRssSourcesPageConfig() {
                 {
                     type: 'reload',
                     align: 'right'
+                },
+                {
+                    type: 'button',
+                    icon: 'fa fa-plus',
+                    label: '添加RSS源',
+                    actionType: 'dialog',
+                    dialog: getRssSourceCreateDialogConfig(),
+                    align: 'right'
                 }
             ],
             footerToolbar: [
@@ -122,7 +260,7 @@ function getRssSourceEditDialogConfig() {
             type: 'form',
             api: {
                 method: 'put',
-                url: '/admin/sources/${id}',
+                url: '/admin/simple-rss/sources/${id}',
                 headers: {
                     'Authorization': 'Bearer ' + localStorage.getItem('admin_token')
                 }
@@ -145,12 +283,6 @@ function getRssSourceEditDialogConfig() {
                     }
                 },
                 {
-                    type: 'input-text',
-                    name: 'category',
-                    label: '分类',
-                    maxLength: 50
-                },
-                {
                     type: 'textarea',
                     name: 'description',
                     label: '描述',
@@ -158,12 +290,11 @@ function getRssSourceEditDialogConfig() {
                 },
                 {
                     type: 'select',
-                    name: 'status',
-                    label: '状态',
-                    required: true,
+                    name: 'isPublic',
+                    label: '公开状态',
                     options: [
-                        { label: '活跃', value: 'active' },
-                        { label: '禁用', value: 'inactive' }
+                        { label: '公开', value: true },
+                        { label: '私有', value: false }
                     ]
                 }
             ]
@@ -182,7 +313,7 @@ function getRssSourceCreateDialogConfig() {
             type: 'form',
             api: {
                 method: 'post',
-                url: '/admin/sources',
+                url: '/admin/simple-rss/sources',
                 headers: {
                     'Authorization': 'Bearer ' + localStorage.getItem('admin_token')
                 }
@@ -207,18 +338,21 @@ function getRssSourceCreateDialogConfig() {
                     placeholder: '请输入RSS源链接'
                 },
                 {
-                    type: 'input-text',
-                    name: 'category',
-                    label: '分类',
-                    maxLength: 50,
-                    placeholder: '请输入分类名称'
-                },
-                {
                     type: 'textarea',
                     name: 'description',
                     label: '描述',
                     maxLength: 500,
                     placeholder: '请输入RSS源描述'
+                },
+                {
+                    type: 'select',
+                    name: 'isPublic',
+                    label: '公开状态',
+                    value: false,
+                    options: [
+                        { label: '公开', value: true },
+                        { label: '私有', value: false }
+                    ]
                 }
             ]
         }

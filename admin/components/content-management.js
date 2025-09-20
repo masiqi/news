@@ -3,12 +3,19 @@
  * 使用后端 /api/content 列表和 /api/content/:id 详情接口
  */
 
+function resolveContentBackendUrl(path) {
+  if (typeof window !== 'undefined' && typeof window.buildAdminBackendUrl === 'function') {
+    return window.buildAdminBackendUrl(path);
+  }
+  return path;
+}
+
 function getContentPageConfig() {
   const listCrud = {
     type: 'crud',
     api: {
       method: 'get',
-      url: 'http://localhost:8787/api/content',
+      url: resolveContentBackendUrl('/api/content'),
       headers: {
         'Authorization': 'Bearer ' + (localStorage.getItem('admin_token') || '')
       },
@@ -91,7 +98,7 @@ function getContentPageConfig() {
             actionType: 'ajax',
             api: {
               method: 'post',
-              url: 'http://localhost:8787/api/content/${id}/reprocess',
+              url: resolveContentBackendUrl('/api/content/${id}/reprocess'),
               headers: {
                 'Authorization': 'Bearer ' + (localStorage.getItem('admin_token') || '')
               }
@@ -104,7 +111,7 @@ function getContentPageConfig() {
             tooltip: '下载Markdown', 
             level: 'link',
             actionType: 'url',
-            url: 'http://localhost:8787/api/content/${id}/download'
+            url: resolveContentBackendUrl('/api/content/${id}/download')
           }
         ]
       }
@@ -126,7 +133,7 @@ function getContentDetailDialogConfig() {
       type: 'service',
       api: {
         method: 'get',
-        url: 'http://localhost:8787/api/content/${id}',
+        url: resolveContentBackendUrl('/api/content/${id}'),
         headers: { 'Authorization': 'Bearer ' + (localStorage.getItem('admin_token') || '') },
         adaptor: function (payload, response) {
           const data = response.data || response;
