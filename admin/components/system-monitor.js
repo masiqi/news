@@ -1,3 +1,10 @@
+const resolveMonitorBackendUrl = (path) => {
+    if (typeof window !== 'undefined' && typeof window.buildAdminBackendUrl === 'function') {
+        return window.buildAdminBackendUrl(path);
+    }
+    return path;
+};
+
 // 系统状态监控组件
 class SystemMonitor {
     constructor() {
@@ -22,8 +29,8 @@ class SystemMonitor {
                             md: 6,
                             body: {
                                 type: 'service',
-                                schema: {
-                                    url: '/api/admin/system/status',
+                                api: {
+                                    url: resolveMonitorBackendUrl('/api/admin/system/status'),
                                     method: 'get',
                                     adaptor: function(payload) {
                                         return {
@@ -65,8 +72,8 @@ class SystemMonitor {
                             md: 6,
                             body: {
                                 type: 'service',
-                                schema: {
-                                    url: '/api/admin/queue/stats',
+                                api: {
+                                    url: resolveMonitorBackendUrl('/api/admin/queue/stats'),
                                     method: 'get',
                                     adaptor: function(payload) {
                                         return {
@@ -162,7 +169,7 @@ class SystemMonitor {
                                 actionType: 'ajax',
                                 api: {
                                     method: 'post',
-                                    url: '/api/admin/system/rss/trigger-fetch'
+                                    url: resolveMonitorBackendUrl('/api/admin/system/rss/trigger-fetch')
                                 },
                                 confirmText: '确定要手动触发RSS抓取吗？'
                             }
@@ -186,7 +193,7 @@ class SystemMonitor {
                                 actionType: 'ajax',
                                 api: {
                                     method: 'post',
-                                    url: '/api/admin/system/queue/cleanup'
+                                    url: resolveMonitorBackendUrl('/api/admin/system/queue/cleanup')
                                 },
                                 confirmText: '确定要清理所有失败的任务吗？'
                             }
@@ -202,8 +209,8 @@ class SystemMonitor {
                                     title: '系统日志',
                                     body: {
                                         type: 'service',
-                                        schema: {
-                                            url: '/api/admin/system/logs',
+                                        api: {
+                                            url: resolveMonitorBackendUrl('/api/admin/system/logs'),
                                             method: 'get'
                                         },
                                         body: [
@@ -254,8 +261,8 @@ class SystemMonitor {
     createQueueDetailTable(queueType) {
         return {
             type: 'service',
-            schema: {
-                url: `/api/admin/system/queue/${queueType}/details`,
+            api: {
+                url: resolveMonitorBackendUrl(`/api/admin/system/queue/${queueType}/details`),
                 method: 'get'
             },
             body: [
@@ -311,7 +318,7 @@ class SystemMonitor {
                                     actionType: 'ajax',
                                     api: {
                                         method: 'post',
-                                        url: `/api/admin/system/queue/${queueType}/retry/${'$id'}`
+                                        url: resolveMonitorBackendUrl(`/api/admin/system/queue/${queueType}/retry/${'$id'}`)
                                     },
                                     visibleOn: '${status} === "failed"'
                                 },
@@ -322,7 +329,7 @@ class SystemMonitor {
                                     actionType: 'ajax',
                                     api: {
                                         method: 'delete',
-                                        url: `/api/admin/system/queue/${queueType}/item/${'$id'}`
+                                        url: resolveMonitorBackendUrl(`/api/admin/system/queue/${queueType}/item/${'$id'}`)
                                     },
                                     confirmText: '确定要删除这个任务吗？'
                                 }
@@ -360,7 +367,9 @@ class SystemMonitor {
 
 // 页面加载完成后初始化
 document.addEventListener('DOMContentLoaded', function() {
-    window.systemMonitor = new SystemMonitor();
+    if (!window.systemMonitor) {
+        window.systemMonitor = new SystemMonitor();
+    }
 });
 
 // 导出组件
@@ -382,8 +391,8 @@ if (typeof module !== 'undefined' && module.exports) {
                                 md: 6,
                                 body: {
                                     type: 'service',
-                                    schema: {
-                                        url: '/api/admin/system/status',
+                                    api: {
+                                        url: resolveMonitorBackendUrl('/api/admin/system/status'),
                                         method: 'get',
                                         adaptor: function(payload) {
                                             return {
@@ -477,8 +486,8 @@ if (typeof module !== 'undefined' && module.exports) {
                                 md: 6,
                                 body: {
                                     type: 'service',
-                                    schema: {
-                                        url: '/api/admin/system/queue/stats',
+                                    api: {
+                                        url: resolveMonitorBackendUrl('/api/admin/system/queue/stats'),
                                         method: 'get'
                                     },
                                     body: [
@@ -561,8 +570,8 @@ if (typeof module !== 'undefined' && module.exports) {
                                 title: 'RSS队列',
                                 body: {
                                     type: 'service',
-                                    schema: {
-                                        url: '/api/admin/system/queue/rss/details',
+                                    api: {
+                                        url: resolveMonitorBackendUrl('/api/admin/system/queue/rss/details'),
                                         method: 'get'
                                     },
                                     body: [
@@ -606,8 +615,8 @@ if (typeof module !== 'undefined' && module.exports) {
                                 title: 'AI队列',
                                 body: {
                                     type: 'service',
-                                    schema: {
-                                        url: '/api/admin/system/queue/ai/details',
+                                    api: {
+                                        url: resolveMonitorBackendUrl('/api/admin/system/queue/ai/details'),
                                         method: 'get'
                                     },
                                     body: [
@@ -666,7 +675,7 @@ if (typeof module !== 'undefined' && module.exports) {
                                     actionType: 'ajax',
                                     api: {
                                         method: 'post',
-                                        url: '/api/admin/system/rss/trigger-fetch'
+                                        url: resolveMonitorBackendUrl('/api/admin/system/rss/trigger-fetch')
                                     },
                                     confirmText: '确定要手动触发RSS抓取吗？'
                                 }
@@ -690,7 +699,7 @@ if (typeof module !== 'undefined' && module.exports) {
                                     actionType: 'ajax',
                                     api: {
                                         method: 'post',
-                                        url: '/api/admin/system/queue/cleanup'
+                                        url: resolveMonitorBackendUrl('/api/admin/system/queue/cleanup')
                                     },
                                     confirmText: '确定要清理所有失败的任务吗？'
                                 }
@@ -706,8 +715,8 @@ if (typeof module !== 'undefined' && module.exports) {
                                         title: '系统日志',
                                         body: {
                                             type: 'service',
-                                            schema: {
-                                                url: '/api/admin/system/logs',
+                                            api: {
+                                                url: resolveMonitorBackendUrl('/api/admin/system/logs'),
                                                 method: 'get'
                                             },
                                             body: [

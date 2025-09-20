@@ -1,9 +1,8 @@
 // src/workers/rss-scheduler.ts
 import { Context } from '@cloudflare/workers-types';
 import { drizzle } from 'drizzle-orm/d1';
-import { sources } from '../db/schema';
-import { eq, and, isNotNull } from 'drizzle-orm';
 import { RssSchedulerService } from '../services/rss-scheduler.service';
+import { QueueProducerService } from '../services/queue/producer';
 
 interface Env {
   DB: D1Database;
@@ -37,7 +36,14 @@ export default {
 
     try {
       const db = drizzle(env.DB);
-      const schedulerService = new RssSchedulerService(env.DB);
+      const queueProducer = new QueueProducerService(env.RSS_FETCHER_QUEUE, {
+        maxBatchSize: 10,
+        maxWaitTimeMs: 1000 * 10,
+        maxRetries: 3,
+        deadLetterQueue: 'RSS_FETCHER_DLQ'
+      });
+
+      const schedulerService = new RssSchedulerService(db, queueProducer, env.RSS_FETCHER_QUEUE);
       
       // 获取所有活跃的RSS源
       const activeSources = await schedulerService.getSourcesToCheck();

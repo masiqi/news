@@ -252,6 +252,9 @@ adminSimpleRssRoutes.post('/sources', async (c) => {
     }
 
     // 创建RSS源
+    const defaultAvailability = 80;
+    const fallbackAvailability = 60; // 仍满足 scheduler 的可用性阈值 (> 50)
+
     const [newSource] = await db
       .insert(sources)
       .values({
@@ -260,9 +263,9 @@ adminSimpleRssRoutes.post('/sources', async (c) => {
         name,
         description: description || rssInfo?.description || null,
         isPublic,
-        qualityAvailability: isValidRss ? 80 : 50, // 开发环境中给予中等质量分数
-        qualityContentQuality: isValidRss ? 70 : 50,
-        qualityUpdateFrequency: isValidRss ? 60 : 50,
+        qualityAvailability: isValidRss ? defaultAvailability : fallbackAvailability,
+        qualityContentQuality: isValidRss ? 70 : 60,
+        qualityUpdateFrequency: isValidRss ? 60 : 60,
         qualityLastValidatedAt: isValidRss ? new Date() : null,
         qualityValidationStatus: isValidRss ? 'approved' : 'pending',
         qualityValidationNotes: isValidRss ? '自动验证通过' : '开发环境：跳过验证，待生产环境验证',

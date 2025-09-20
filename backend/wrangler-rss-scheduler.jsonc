@@ -10,15 +10,15 @@
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "news_platform",
-      "database_id": "news_platform_db",
+      "database_name": "news-db",
+      "database_id": "local",
       "migrations_dir": "src/db/migrations"
     }
   ],
   "queues": {
     "producers": [
       {
-        "queue": "rss-fetcher-queue",
+        "queue": "RSS_FETCHER_QUEUE",
         "binding": "RSS_FETCHER_QUEUE"
       }
     ]

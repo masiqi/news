@@ -299,6 +299,9 @@ adminRssManagementRoutes.post('/sources', async (c) => {
     }
 
     // 创建RSS源
+    const defaultAvailability = 80;
+    const fallbackAvailability = 60;
+
     const [newSource] = await db
       .insert(sources)
       .values({
@@ -307,9 +310,9 @@ adminRssManagementRoutes.post('/sources', async (c) => {
         name,
         description: description || rssInfo?.description || null,
         isPublic,
-        qualityAvailability: isValidRss ? 80 : 0,
-        qualityContentQuality: isValidRss ? 70 : 0,
-        qualityUpdateFrequency: isValidRss ? 60 : 0,
+        qualityAvailability: isValidRss ? defaultAvailability : fallbackAvailability,
+        qualityContentQuality: isValidRss ? 70 : 60,
+        qualityUpdateFrequency: isValidRss ? 60 : 60,
         qualityLastValidatedAt: isValidRss ? new Date() : null,
         qualityValidationStatus: isValidRss ? 'approved' : 'pending',
         qualityValidationNotes: isValidRss ? '自动验证通过' : 'RSS验证失败',
