@@ -86,43 +86,62 @@ export class CloudflareLLMService {
   }
 
   /**
-   * 构建分析提示词
+   * 构建分析提示词 - 与GLM保持一致
    */
   private static buildAnalysisPrompt(title: string, content: string, isHtml: boolean): string {
-    return `请分析以下新闻内容，返回JSON格式的分析结果。
+    console.log('[PROMPT] Building Cloudflare analysis prompt, HTML mode: ' + isHtml + ', content length: ' + content.length);
+    if (isHtml) {
+      console.log('[PROMPT] Raw HTML first 500 chars: ' + content.substring(0, 500));
+    }
+    console.log('[PROMPT] Title: ' + title);
+    console.log('[PROMPT] Content length: ' + content.length + ' chars');
+    console.log('[PROMPT] Content source: ' + (isHtml ? 'Web scraping' : 'RSS original'));
+    
+    return `你是一个专业的新闻内容分析专家，擅长从HTML页面中提取和解析新闻内容。请对以下中文新闻内容进行全面分析。
 
 新闻标题：${title}
-
-新闻内容：
+${isHtml ? '新闻原文（HTML格式）：' : '新闻原文（RSS摘要）：'}
 ${content}
 
-请按照以下JSON格式返回分析结果：
-{
-  "topics": ["主题1", "主题2", "主题3"],
-  "keywords": ["关键词1", "关键词2", "关键词3"],
-  "sentiment": "positive/negative/neutral",
-  "analysis": "深度分析内容...",
-  "educationalValue": "教育价值说明...",
-  "extractedContent": "提取的核心内容..."
-}
+${isHtml ? `
+重要说明：
+1. 上述内容是HTML格式的原始网页，请忽略HTML标签、广告、导航等无关内容
+2. 重点提取新闻正文部分，特别是完整的问答内容
+3. 如果是记者问答形式，请确保包含问题和完整的回答部分
+` : ''}
 
-要求：
-1. 分析要深入，不要只做表面描述
-2. 识别出真正的主题和关键词，不要重复标题内容
-3. 情感分析要准确，考虑内容的实际含义
-4. 提供有深度的分析和见解
-5. 重点关注教育价值和知识普及
-6. 提取内容要准确，避免复制不相关的文本
-7. ${isHtml ? '请仔细解析HTML，提取完整的新闻内容，特别是长篇文章、问答形式或系列报道' : '请基于提供的文本内容进行分析'}
-8. 支持长篇文章分析，不要因内容长度而丢失重要信息
-9. 请确保你返回的JSON格式100%正确，避免任何解析错误`;
+请严格按照以下JSON格式返回分析结果，不要添加任何额外的文本、注释或格式：
+
+{"topics": ["主题1", "主题2", "主题3"], "keywords": ["关键词1", "关键词2", "关键词3"], "sentiment": "positive|negative|neutral", "analysis": "深度分析内容...", "educationalValue": "教育价值评估...", "extractedContent": "提取的完整新闻内容（如果有）", "images": ["图片URL1", "图片URL2"]}
+
+注意：
+1. topics: 3-5个核心主题，每个主题2-6个字
+2. keywords: 8-15个重要关键词（包括重要人名、地名、机构名、专业术语等）
+3. sentiment: 只能是positive、negative或neutral中的一个
+4. analysis: 200-300字的深度分析，解读新闻的背景、意义、影响和相关背景
+5. educationalValue: 100-200字评估，说明对高中生的教育意义和学习价值，包括相关知识点
+6. extractedContent: 如果从HTML中提取到了比文本更完整的新闻内容，请提供清理后的完整文本（保持段落结构）
+7. images: 从HTML中提取的所有图片URL数组（包括新闻配图、图表等所有相关图片）
+
+重要要求：
+1. **JSON格式必须完全有效**：确保返回的JSON可以被直接解析，不要包含任何语法错误
+2. **引号处理**：如果在analysis、educationalValue或extractedContent字段中需要引用原文的引号内容，请正确转义为\\"，例如："原子能法强调\\"和平利用\\"原则"
+3. 不要在JSON中包含换行符或制表符，保持单行格式
+4. 不要添加注释或说明文字，只返回纯JSON
+5. ${isHtml ? '请仔细解析HTML，提取完整的新闻内容，特别是长篇文章、问答形式或系列报道' : '请基于提供的文本内容进行分析'}
+6. 支持长篇文章分析，不要因内容长度而丢失重要信息
+7. **图片Markdown格式**：${isHtml ? '如果在HTML中发现图片标签（<img src="...">），请在extractedContent中将图片标签转换为Markdown格式![图片描述](图片URL)，确保图片在文章的正确位置显示。同时也要将图片URL收集到images数组中' : '如果原文中有图片信息，请在extractedContent中在相应位置添加Markdown格式图片![图片](图片URL)'}
+8. 请确保你返回的JSON格式100%正确，避免任何解析错误`;
   }
 
   /**
    * 解析AI返回结果，与UnifiedLLMService保持一致
    */
   private static parseAIResult(resultText: string): LLMAnalysisResult {
-    console.log(`[PARSE] 开始解析AI响应，原始长度: ${resultText.length}`);
+    console.log(`[PARSE] 开始解析Cloudflare AI响应，原始长度: ${resultText.length}`);
+    console.log('[DEBUG] ===== CLOUDFLARE AI COMPLETE RESPONSE START =====');
+    console.log(resultText);
+    console.log('[DEBUG] ===== CLOUDFLARE AI COMPLETE RESPONSE END =====');
 
     // 1. 尝试直接解析JSON
     try {
@@ -135,6 +154,7 @@ ${content}
         analysis: parsed.analysis || '',
         educationalValue: parsed.educationalValue || '',
         extractedContent: parsed.extractedContent || '',
+        images: parsed.images || [],
         wordCounts: {
           analysis: (parsed.analysis || '').length,
           educationalValue: (parsed.educationalValue || '').length,
@@ -146,100 +166,80 @@ ${content}
     }
 
     // 2. 尝试从响应中提取JSON部分
-    const jsonMatch = resultText.match(/\{[\s\S]*\}/);
+    let jsonMatch = resultText.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
       console.error(`[ERROR] 响应中未找到JSON格式`);
       throw new Error('AI响应中未找到有效的JSON格式');
     }
 
-    console.log(`[INFO] 找到JSON部分，开始解析...`);
+    console.log(`[SUCCESS] 找到JSON格式响应，开始解析`);
     let cleanJson = jsonMatch[0];
-    console.log(`[CLEAN] 清理后的JSON: ${cleanJson.substring(0, 200)}...`);
+    console.log('[CLEAN] Cleaned JSON: ' + cleanJson.substring(0, 200) + '...');
     
-    // 3. 清理JSON字符串
+    // 3. 清理JSON字符串 - 使用与GLM相同的清理逻辑
     cleanJson = this.cleanJsonString(cleanJson);
-    console.log(`[CLEAN] 清理完成，最终JSON长度: ${cleanJson.length}`);
-
+    console.log('[CLEAN] JSON cleaning completed, cleaned length: ' + cleanJson.length);
+    
     // 4. 解析清理后的JSON
+    let parsed;
     try {
-      const parsed = JSON.parse(cleanJson);
-      console.log(`[SUCCESS] JSON解析成功`);
-      return {
-        topics: parsed.topics || [],
-        keywords: parsed.keywords || [],
-        sentiment: parsed.sentiment || 'neutral',
-        analysis: parsed.analysis || '',
-        educationalValue: parsed.educationalValue || '',
-        extractedContent: parsed.extractedContent || '',
-        wordCounts: {
-          analysis: (parsed.analysis || '').length,
-          educationalValue: (parsed.educationalValue || '').length,
-          extractedContent: (parsed.extractedContent || '').length
-        }
-      };
+      parsed = JSON.parse(cleanJson);
     } catch (parseError) {
-      console.error(`[ERROR] JSON解析失败: ${parseError}`);
-      console.error(`[ERROR] 尝试解析的JSON: ${cleanJson.substring(0, 500)}...`);
-      throw new Error(`JSON解析失败: ${parseError}`);
+      console.error('[ERROR] JSON parsing failed: ' + parseError);
+      throw new Error('AI returned JSON format invalid and cannot be auto-fixed: ' + parseError);
     }
+
+    if (!Array.isArray(parsed.topics) || !Array.isArray(parsed.keywords) || !parsed.sentiment) {
+      console.error('[ERROR] AI analysis result missing required fields');
+      throw new Error('AI analysis result incomplete');
+    }
+
+    console.log('[RESULT] Cloudflare AI parsing result:');
+    console.log('   - Topics (' + parsed.topics.length + '): ' + parsed.topics.join(', '));
+    console.log('   - Keywords (' + parsed.keywords.length + '): ' + parsed.keywords.join(', '));
+    console.log('   - Sentiment: ' + parsed.sentiment);
+
+    return {
+      topics: parsed.topics.slice(0, 5),
+      keywords: parsed.keywords.slice(0, 10),
+      sentiment: parsed.sentiment,
+      analysis: parsed.analysis || '',
+      educationalValue: parsed.educationalValue || '',
+      extractedContent: parsed.extractedContent || '',
+      images: parsed.images || [],
+      wordCounts: {
+        analysis: (parsed.analysis || '').length,
+        educationalValue: (parsed.educationalValue || '').length,
+        extractedContent: (parsed.extractedContent || '').length
+      }
+    };
   }
 
   /**
-   * 清理JSON字符串，移除可能导致解析错误的字符（与UnifiedLLMService保持一致）
+   * 清理JSON字符串 - 与GLM服务完全一致
    */
   private static cleanJsonString(jsonStr: string): string {
-    console.log(`[CLEAN] 开始清理JSON字符串，原始长度: ${jsonStr.length}`);
+    console.log('[CLEAN] Cleaning JSON string, original length: ' + jsonStr.length);
     
     let cleaned = jsonStr;
     
-    // 1. 移除控制字符
-    cleaned = cleaned.replace(/[\x00-\x1F\x7F]/g, '');
+    // Only remove control characters that could break JSON parsing
+    cleaned = cleaned.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
     
-    // 2. 修复常见的JSON格式问题
-    cleaned = cleaned.replace(/，/g, ',');
-    cleaned = cleaned.replace(/：/g, ':');
-    cleaned = cleaned.replace(/"/g, '"');
-    cleaned = cleaned.replace(/"/g, '"');
+    // Fix Chinese quotes (only if they're not already properly escaped)
+    cleaned = cleaned.replace(/[""]/g, '"');
+    cleaned = cleaned.replace(/[""]/g, '"');
     
-    // 3. 修复引号问题
-    cleaned = cleaned.replace(/(['"])(?=(?:[^"\\]|\\.)*["])/g, '"');
-    
-    // 4. 修复转义字符
-    cleaned = cleaned.replace(/\\n/g, '\\\\n')
-                   .replace(/\\r/g, '\\\\r')
-                   .replace(/\\t/g, '\\\\t');
-    
-    // 5. 修复JSON格式问题
+    // Fix trailing commas in objects and arrays
     cleaned = cleaned.replace(/,\s*}/g, '}')
                    .replace(/,\s*]/g, ']');
     
-    // 6. 移除BOM
+    // Remove BOM
     cleaned = cleaned.replace(/^\uFEFF/, '').trim();
     
-    // 7. 移除可能导致JSON解析错误的字符
-    cleaned = cleaned.replace(/[\u2028\u2029]/g, '');
+    console.log('[CLEAN] JSON cleaning completed, cleaned length: ' + cleaned.length);
+    console.log('[CLEAN] Cleaned JSON preview: ' + cleaned.substring(0, 200) + '...');
     
-    // 8. 确保JSON字符串格式正确
-    try {
-      JSON.parse(cleaned);
-      console.log(`[SUCCESS] JSON格式验证通过`);
-    } catch (e) {
-      console.log(`[WARN] JSON格式仍有问题，尝试简单修复`);
-      // 基本的引号修复
-      cleaned = cleaned.replace(/(\w+)\s*:/g, '"$1":');
-      cleaned = cleaned.replace(/:\s*'([^']*?)'/g, ': "$1"');
-      cleaned = cleaned.replace(/:\s*"([^"]*?)"/g, ': "$1"');
-      
-      // 尝试再次解析
-      try {
-        JSON.parse(cleaned);
-        console.log(`[SUCCESS] JSON格式修复验证通过`);
-      } catch (e2) {
-        console.log(`[ERROR] JSON格式修复失败，使用原始清理结果`);
-      }
-    }
-    
-    console.log(`[SUCCESS] JSON清理完成，最终长度: ${cleaned.length}`);
     return cleaned;
   }
 }

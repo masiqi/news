@@ -17,6 +17,15 @@ import adminAccessRoutes from "./routes/admin-access";
 import autoStorageRoutes from "./routes/auto-storage";
 import credentialRoutes from "./routes/credentials";
 import webdavRoutes from "./routes/webdav";
+import distributionRoutes from "./routes/distribution";
+import editIsolationRoutes from "./routes/edit-isolation";
+import optimizationRoutes from "./routes/storage-optimization";
+import rssRoutes from "./routes/rss";
+import statusRoutes from "./routes/api-status";
+import monitoringRoutes from "./routes/monitoring";
+import aiRoutes from "./routes/ai";
+// 暂时注释掉GLM路由，因为有导入错误
+// import glmRoutes from "./routes/glm";
 // 移除测试路由导入
 import llmExtractorRoutes from "./services/llm-extractor";
 import llmContentExtractorRoutes from "./services/llm-content-extractor";
@@ -63,7 +72,7 @@ app.route("/web-content", webContentRoutes);
 app.route("/api/content", contentRoutes);
 
 // 注册AI重新处理路由
-app.route("/api/content/reprocess", reprocessRoutes);
+app.route("/api/content", reprocessRoutes);
 
 // 注册标签聚合路由
 app.route("/api/tags", tagsRoutes);
@@ -85,6 +94,30 @@ app.route("/api", autoStorageRoutes);
 
 // 注册WebDAV路由
 app.route("/webdav", webdavRoutes);
+
+// 注册用户编辑隔离管理API路由
+app.route("/api/edit-isolation", editIsolationRoutes);
+
+// 注册存储优化管理API路由
+app.route("/api/storage-optimization", optimizationRoutes);
+
+// 注册内容分发管理API路由
+app.route("/api/content-distribution", distributionRoutes);
+
+// 注册RSS处理API路由
+app.route("/api/rss", rssRoutes);
+
+// 注册系统状态API路由
+app.route("/api", statusRoutes);
+
+// 注册监控API路由
+app.route("/api/monitoring", monitoringRoutes);
+
+// 注册AI处理API路由
+app.route("/api/ai", aiRoutes);
+
+// 暂时注释掉GLM路由
+// app.route("/api/glm", glmRoutes);
 
 // 移除测试路由注册
 
