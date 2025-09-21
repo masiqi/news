@@ -2,9 +2,30 @@
 import { Hono } from "hono";
 import { drizzle } from 'drizzle-orm/d1';
 import { rssEntries, processedContents, sources } from '../db/schema';
-import { eq, and, or, like, desc, isNull, isNotNull, sql } from 'drizzle-orm';
+import { eq, and, or, like, ilike, desc, isNull, isNotNull, sql } from 'drizzle-orm';
 
 const contentRoutes = new Hono<{ Bindings: CloudflareBindings }>();
+
+const escapeHtml = (input: string): string =>
+  input
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+
+type TagLinkType = 'topics' | 'keywords';
+
+const buildTagLink = (type: TagLinkType, label: string): string => {
+  const rawValue = typeof label === 'string' ? label : String(label ?? '');
+  const safeLabel = escapeHtml(rawValue);
+  const encodedValue = encodeURIComponent(rawValue);
+  const color = type === 'topics' ? '#e3f2fd' : '#f3e5f5';
+  const textColor = type === 'topics' ? '#1976d2' : '#7b1fa2';
+  const title = type === 'topics' ? '点击查看相关主题内容' : '点击查看相关关键词内容';
+
+  return `<a href="#/tags" data-tag="${encodedValue}" onclick="return window.handleTagLinkClick ? window.handleTagLinkClick('${type}', decodeURIComponent(this.dataset.tag)) : true;" style="display: inline-block; margin: 2px; padding: 4px 12px; background: ${color}; color: ${textColor}; text-decoration: none; border-radius: 16px; font-size: 13px; font-weight: 500;" title="${title}">${safeLabel}</a>`;
+};
 
 // 获取内容列表
 contentRoutes.get("/", async (c) => {
@@ -184,10 +205,36 @@ contentRoutes.get("/:id", async (c) => {
     }
 
     // 格式化主题和关键词
+    let topicsArray = [];
+    let keywordsArray = [];
+    
+    try {
+      topicsArray = content.topics ? JSON.parse(content.topics) : [];
+    } catch (e) {
+      topicsArray = [];
+    }
+    
+    try {
+      keywordsArray = content.keywords ? content.keywords.split(',').filter(k => k.trim()) : [];
+    } catch (e) {
+      keywordsArray = [];
+    }
+    
+    // 生成主题和关键词的HTML显示
+    const topicsDisplay = topicsArray.length > 0 
+      ? topicsArray.map(topic => buildTagLink('topics', topic)).join(' ')
+      : '暂无主题';
+      
+    const keywordsDisplay = keywordsArray.length > 0 
+      ? keywordsArray.map(keyword => buildTagLink('keywords', keyword)).join(' ')
+      : '暂无关键词';
+
     const formattedContent = {
       ...content,
-      topics: content.topics ? JSON.parse(content.topics) : [],
-      keywords: content.keywords ? content.keywords.split(',').filter(k => k.trim()) : []
+      topics: topicsArray,
+      keywords: keywordsArray,
+      topics_display: topicsDisplay,
+      keywords_display: keywordsDisplay
     };
 
     return c.json({

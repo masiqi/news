@@ -98,6 +98,9 @@ function getTopicsTable() {
       method: 'get',
       url: resolveTagsBackendUrl('/admin/tags/aggregation/topics'),
       headers: buildAuthHeaders(),
+      data: {
+        search: typeof localStorage !== 'undefined' ? localStorage.getItem('tag_search') || '' : ''
+      },
       adaptor: function(payload) {
         const topics = payload?.data?.topics || payload?.topics || [];
         return {
@@ -109,6 +112,25 @@ function getTopicsTable() {
           }
         };
       }
+    },
+    filter: {
+      title: '搜索主题',
+      submitText: '搜索',
+      controls: [
+        {
+          type: 'text',
+          name: 'search',
+          label: '主题名称',
+          placeholder: '输入主题名称进行搜索',
+          value: typeof localStorage !== 'undefined' ? localStorage.getItem('tag_search') || '' : '',
+          clearable: true,
+          onChange: function(value) {
+            if (typeof localStorage !== 'undefined' && !value) {
+              localStorage.removeItem('tag_search');
+            }
+          }
+        }
+      ]
     },
     columns: [
       {
@@ -213,6 +235,9 @@ function getKeywordsTable() {
       method: 'get',
       url: resolveTagsBackendUrl('/admin/tags/aggregation/keywords'),
       headers: buildAuthHeaders(),
+      data: {
+        search: typeof localStorage !== 'undefined' ? localStorage.getItem('tag_search') || '' : ''
+      },
       adaptor: function(payload) {
         const keywords = payload?.data?.keywords || payload?.keywords || [];
         return {
@@ -224,6 +249,25 @@ function getKeywordsTable() {
           }
         };
       }
+    },
+    filter: {
+      title: '搜索关键词',
+      submitText: '搜索',
+      controls: [
+        {
+          type: 'text',
+          name: 'search',
+          label: '关键词',
+          placeholder: '输入关键词进行搜索',
+          value: typeof localStorage !== 'undefined' ? localStorage.getItem('tag_search') || '' : '',
+          clearable: true,
+          onChange: function(value) {
+            if (typeof localStorage !== 'undefined' && !value) {
+              localStorage.removeItem('tag_search');
+            }
+          }
+        }
+      ]
     },
     columns: [
       {
@@ -325,6 +369,13 @@ function getTagsPageConfig() {
   return {
     type: 'page',
     title: '标签管理',
+    onEvent: {
+      type: 'page',
+      init: function() {
+        // 页面初始化时不立即清理搜索参数，让用户可以看到搜索结果
+        // 可以在用户进行新的搜索时再清理
+      }
+    },
     body: [
       getTagsStatsSection(),
       {
@@ -332,6 +383,7 @@ function getTagsPageConfig() {
       },
       {
         type: 'tabs',
+        activeKey: typeof localStorage !== 'undefined' ? (localStorage.getItem('tags_tab') === 'keywords' ? 1 : 0) : 0,
         tabs: [
           {
             title: '主题管理',

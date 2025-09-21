@@ -9,8 +9,8 @@ require('dotenv').config();
 
 // 从配置文件加载配置
 const config = JSON.parse(fs.readFileSync('./config.json', 'utf8'));
-const backendHost = process.env.BACKEND_HOST || (config.development ? config.development.backendHost : 'localhost');
-const backendPort = process.env.BACKEND_PORT || (config.development ? config.development.backendPort : 8787);
+const backendHost = process.env.BACKEND_HOST || 'localhost';
+const backendPort = process.env.BACKEND_PORT || 34335;
 const backendUrl = `http://${backendHost}:${backendPort}`;
 
 console.log(`后端服务URL: ${backendUrl}`);

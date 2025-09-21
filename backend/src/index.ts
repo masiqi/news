@@ -1,6 +1,11 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import type { Env } from './env';
+
+// 开发环境加载.env文件
+if (process.env.NODE_ENV !== 'production') {
+  require('dotenv').config();
+}
 import authRoutes from "./routes/auth";
 import sourceRoutes from "./routes/sources";
 import userRoutes from "./routes/users";

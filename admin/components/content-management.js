@@ -94,7 +94,17 @@ function getContentPageConfig() {
             tooltip: '查看详情', 
             level: 'link', 
             actionType: 'dialog',
-            dialog: getContentDetailDialogConfig()
+            dialog: getContentDetailDialogConfig(),
+            onEvent: {
+              click: function() {
+                // 点击查看详情时保存内容ID到localStorage
+                console.log('🔍 点击查看详情按钮，保存内容ID:', this.id);
+                if (this.id) {
+                  localStorage.setItem('recent_content_id', this.id);
+                  console.log('✅ 内容ID已保存到localStorage:', this.id);
+                }
+              }
+            }
           },
           {
             type: 'button', 
@@ -146,6 +156,11 @@ function getContentDetailDialogConfig() {
           const data = response.data || response;
           const c = data.content || data;
           // 确保所有数据都正确传递
+          console.log('🔍 API适配器被调用，原始数据:', c);
+          console.log('🔍 主题数据:', c.topics);
+          console.log('🔍 关键词数据:', c.keywords);
+          console.log('🔍 主题显示数据:', c.topics_display);
+          console.log('🔍 关键词显示数据:', c.keywords_display);
           return { status: 0, msg: '', data: c };
         }
       },
@@ -198,21 +213,23 @@ function getContentDetailDialogConfig() {
             body: {
               type: 'grid',
               columns: [
-                { 
-                  md: 6, 
-                  body: { 
-                    type: 'static',
-                    name: 'topics',
-                    label: '主题'
-                  } 
+                {
+                  md: 6,
+                  body: {
+                    type: 'tpl',
+                    name: 'topics_display',
+                    label: '主题',
+                    tpl: '${topics_display | raw}'
+                  }
                 },
-                { 
-                  md: 6, 
-                  body: { 
-                    type: 'static',
-                    name: 'keywords', 
-                    label: '关键词'
-                  } 
+                {
+                  md: 6,
+                  body: {
+                    type: 'tpl',
+                    name: 'keywords_display',
+                    label: '关键词',
+                    tpl: '${keywords_display | raw}'
+                  }
                 }
               ]
             }
@@ -249,10 +266,49 @@ function getContentDetailDialogConfig() {
   };
 }
 
+// 导航到标签页面并带上筛选条件
+function handleTagLinkClick(type, rawValue) {
+  if (typeof window === 'undefined') {
+    return true;
+  }
+
+  const normalizedType = type === 'topics' ? 'topics' : 'keywords';
+  const searchValue = typeof rawValue === 'string' ? rawValue : '';
+
+  try {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('tags_tab', normalizedType);
+      localStorage.setItem('tag_search', searchValue);
+    }
+  } catch (error) {
+    console.warn('保存标签筛选条件失败:', error);
+  }
+
+  const targetHash = '#/tags';
+  if (window.location.hash === targetHash) {
+    const hashChangeEvent = typeof HashChangeEvent === 'function'
+      ? new HashChangeEvent('hashchange')
+      : new Event('hashchange');
+    window.dispatchEvent(hashChangeEvent);
+  } else {
+    window.location.hash = targetHash;
+  }
+
+  if (typeof document !== 'undefined') {
+    const modalClose = document.querySelector('.cxd-Modal-close');
+    if (modalClose instanceof HTMLElement) {
+      modalClose.click();
+    }
+  }
+
+  return false;
+}
+
 // UMD-style export
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { getContentPageConfig };
+  module.exports = { getContentPageConfig, handleTagLinkClick };
 } else if (typeof window !== 'undefined') {
   window.getContentPageConfig = getContentPageConfig;
   window.ContentComponents = { getContentPageConfig };
+  window.handleTagLinkClick = handleTagLinkClick;
 }

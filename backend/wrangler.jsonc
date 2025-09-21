@@ -63,7 +63,10 @@
         "ADMIN_USERNAME": "admin",
         "ADMIN_PASSWORD": "admin123",
         "DEFAULT_LLM_PROVIDER": "auto",
-        "ENABLE_LLM_FALLBACK": "true"
+        "ENABLE_LLM_FALLBACK": "true",
+        "ZHIPUAI_API_KEY": "64b344b8a9434851bba8637ebee67db0.qTPcjUmHGiCeGFjY",
+        "OPENROUTER_API_KEY": "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",
+        "NODE_ENV": "development"
       },
       "ai": {
         "binding": "AI"
