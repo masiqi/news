@@ -2,12 +2,12 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   // 生产环境静态导出配置
-  output: 'export',
-  trailingSlash: true,
+  output: process.env.NODE_ENV === 'production' ? 'export' : undefined,
+  trailingSlash: process.env.NODE_ENV === 'production',
   
   // 图片优化配置（静态导出时需要）
   images: {
-    unoptimized: true,
+    unoptimized: process.env.NODE_ENV === 'production',
   },
   
   // 解决开发环境跨域警告
@@ -26,6 +26,15 @@ const nextConfig: NextConfig = {
     }
     // 生产环境不重写，直接使用 Cloudflare Workers 地址
     return [];
+  },
+  
+  // 禁用中间件（在静态导出时）
+  webpack: (config) => {
+    if (process.env.NODE_ENV === 'production') {
+      // 静态导出时禁用一些不需要的功能
+      config.optimization.splitChunks = false;
+    }
+    return config;
   },
   
   // 实验性功能
