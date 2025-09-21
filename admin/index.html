@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI资讯平台管理后台</title>
+    <title>墨香蒸馏管理后台</title>
     <!-- Use jsDelivr CDN for complete AMIS bundle (includes proper third assets) -->
     <link href="https://cdn.jsdelivr.net/npm/amis@6.13.0/sdk/sdk.css" rel="stylesheet"/>
     <script src="https://cdn.jsdelivr.net/npm/amis@6.13.0/sdk/sdk.js"></script>
@@ -367,7 +367,7 @@
             // 始终包裹导航布局，保证左侧导航固定，右侧内容切换
             if (typeof NavComponents !== 'undefined' && NavComponents.createNavLayout) {
                 const wrapped = NavComponents.createNavLayout({
-                    title: 'AI资讯平台管理后台',
+                    title: '墨香蒸馏管理后台',
                     body: schema.body ? schema.body : schema
                 });
                 amis.require('amis/embed').embed('#root', wrapped);
