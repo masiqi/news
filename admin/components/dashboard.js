@@ -198,14 +198,14 @@ function getHomePageConfig() {
     // 使用导航布局
     if (typeof NavComponents !== 'undefined' && NavComponents.createNavLayout) {
         return NavComponents.createNavLayout({
-            title: 'AI资讯平台管理后台',
+            title: '墨香蒸馏管理后台',
             body: dashboardBody
         });
     } else {
         // 如果导航组件不可用，使用简单布局
         return {
             type: 'page',
-            title: 'AI资讯平台管理后台',
+            title: '墨香蒸馏管理后台',
             body: dashboardBody
         };
     }

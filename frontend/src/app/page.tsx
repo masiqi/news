@@ -205,7 +205,7 @@ export default function HomePage() {
               </a>
             </div>
             <p className="mt-8 text-base text-gray-400 md:mt-0 md:order-1">
-              &copy; 2025 AI资讯平台. 保留所有权利.
+              &copy; 2025 墨香蒸馏. 保留所有权利.
             </p>
           </div>
         </div>

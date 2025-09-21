@@ -15,7 +15,7 @@ function resolveLoginBackendUrl(path) {
 function getLoginPageConfig() {
     return {
         type: 'page',
-        title: 'AI资讯平台管理后台 - 登录',
+        title: '墨香蒸馏管理后台 - 登录',
         body: {
             type: 'form',
             title: '管理员登录',

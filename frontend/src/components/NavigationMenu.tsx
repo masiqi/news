@@ -63,7 +63,7 @@ export default function NavigationMenu() {
           <div className="flex">
             <div className="flex-shrink-0 flex items-center">
               <Link href="/" className="text-xl font-bold text-indigo-600">
-                AI资讯平台
+                墨香蒸馏
               </Link>
             </div>
             {isLoggedIn && (

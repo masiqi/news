@@ -44,12 +44,12 @@ function getNavigationConfig() {
 function createNavLayout(pageConfig) {
     return {
         type: 'page',
-        title: pageConfig.title || 'AI资讯平台管理后台',
+        title: pageConfig.title || '墨香蒸馏管理后台',
         asideResizor: true,
         aside: [
             {
                 type: 'tpl',
-                tpl: '<div class="logo-wrapper"><div class="logo">AI资讯平台</div></div>',
+                tpl: '<div class="logo-wrapper"><div class="logo">墨香蒸馏</div></div>',
                 className: 'logo-wrapper'
             },
             getNavigationConfig()
