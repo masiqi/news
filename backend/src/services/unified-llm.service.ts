@@ -3,6 +3,7 @@ import { drizzle } from 'drizzle-orm/d1';
 import { rssEntries, processedContents } from '../db/schema';
 import { eq } from 'drizzle-orm';
 import { CloudflareLLMService } from './cloudflare-llm.service';
+import { OpenRouterService } from './openrouter.service';
 
 export interface LLMAnalysisResult {
   topics: string[];
@@ -27,46 +28,147 @@ export interface LLMProcessingParams {
   link?: string;
   isHtml?: boolean;
   apiKey: string;
+  provider?: 'glm' | 'openrouter' | 'cloudflare' | 'auto';
+  openRouterKey?: string;
+  enableFallback?: boolean;
 }
 
 export class UnifiedLLMService {
   
   static async analyzeContent(params: LLMProcessingParams, env?: any): Promise<LLMAnalysisResult> {
-    const { title, content, link, isHtml = false, apiKey } = params;
+    const { 
+      title, 
+      content, 
+      link, 
+      isHtml = false, 
+      apiKey, 
+      provider = 'auto', 
+      openRouterKey,
+      enableFallback = true 
+    } = params;
     const startTime = Date.now();
 
     console.log('=== Starting unified LLM analysis, title: ' + title + ' ===');
     console.log('[INFO] Content length: ' + content.length + ' chars');
     console.log('[PROCESS] Content type: ' + (isHtml ? 'HTML format' : 'Text format'));
     console.log('[LINK] Source link: ' + (link || 'None'));
-    console.log('[ENV] Cloudflare AI available: ' + (env ? 'Yes' : 'No'));
+    console.log('[PROVIDER] LLM provider strategy: ' + provider);
+    console.log('[FALLBACK] Fallback enabled: ' + enableFallback);
 
-    try {
-      console.log('[AI] Starting GLM analysis...');
-      const glmResult = await this.analyzeWithGLM(params);
-      console.log('[SUCCESS] GLM analysis successful');
-      return glmResult;
-    } catch (glmError) {
-      console.error('[ERROR] GLM analysis failed:', glmError);
-      console.error('[ERROR] GLM error details:', JSON.stringify(glmError, null, 2));
+    // 定义三级处理策略
+    const strategies = this.getProcessingStrategies(provider, enableFallback);
+    
+    let lastError: Error | null = null;
+    
+    // 按顺序尝试每个策略
+    for (let i = 0; i < strategies.length; i++) {
+      const strategy = strategies[i];
+      console.log(`[STRATEGY ${i + 1}/${strategies.length}] Trying ${strategy.name}...`);
       
-      // 启用Cloudflare AI备用逻辑
-      if (env) {
-        console.log('[PROCESS] Trying Cloudflare AI as fallback...');
-        try {
-          const cfResult = await CloudflareLLMService.analyzeContent(params, env);
-          console.log('[SUCCESS] Cloudflare AI analysis successful');
-          return cfResult;
-        } catch (cfError) {
-          console.error('[ERROR] Cloudflare AI also failed:', cfError);
-          console.error('[ERROR] Cloudflare AI error details:', JSON.stringify(cfError, null, 2));
-          throw glmError;
+      try {
+        const result = await this.executeStrategy(strategy, params, env);
+        console.log(`[SUCCESS] ${strategy.name} analysis completed successfully`);
+        return result;
+      } catch (error) {
+        lastError = error as Error;
+        console.error(`[ERROR] ${strategy.name} failed:`, error instanceof Error ? error.message : error);
+        
+        if (i < strategies.length - 1) {
+          console.log(`[FALLBACK] Moving to next strategy...`);
+        } else {
+          console.log(`[ERROR] All strategies failed`);
         }
-      } else {
-        console.log('[ERROR] No Cloudflare AI env available, throwing GLM error');
-        throw glmError;
       }
     }
+    
+    // 所有策略都失败了
+    throw lastError || new Error('All LLM processing strategies failed');
+  }
+
+  private static getProcessingStrategies(provider: string, enableFallback: boolean): Array<{
+    name: string;
+    execute: (params: LLMProcessingParams, env?: any) => Promise<LLMAnalysisResult>;
+  }> {
+    const strategies: Array<{
+      name: string;
+      execute: (params: LLMProcessingParams, env?: any) => Promise<LLMAnalysisResult>;
+    }> = [];
+
+    // 根据provider策略决定执行顺序
+    switch (provider) {
+      case 'glm':
+        strategies.push({
+          name: 'GLM (智谱AI)',
+          execute: (params) => this.analyzeWithGLM(params)
+        });
+        break;
+
+      case 'openrouter':
+        strategies.push({
+          name: 'OpenRouter GLM',
+          execute: (params) => OpenRouterService.analyzeContent({
+            ...params,
+            apiKey: params.openRouterKey || ''
+          }, 'z-ai/glm-4.5-air:free')
+        });
+        break;
+
+      case 'cloudflare':
+        strategies.push({
+          name: 'Cloudflare AI',
+          execute: (params, env) => {
+            if (!env) throw new Error('Cloudflare environment required');
+            return CloudflareLLMService.analyzeContent(params, env);
+          }
+        });
+        break;
+
+      case 'auto':
+      default:
+        // 三级处理：智谱 → OpenRouter → Cloudflare
+        strategies.push({
+          name: 'GLM (智谱AI)',
+          execute: (params) => this.analyzeWithGLM(params)
+        });
+
+        if (enableFallback) {
+          strategies.push({
+            name: 'OpenRouter GLM (备用)',
+            execute: (params) => {
+              if (!params.openRouterKey) throw new Error('OpenRouter API key required');
+              return OpenRouterService.analyzeContent({
+                ...params,
+                apiKey: params.openRouterKey
+              }, 'z-ai/glm-4.5-air:free');
+            }
+          });
+
+          strategies.push({
+            name: 'Cloudflare AI (备用)',
+            execute: (params, env) => {
+              if (!env) throw new Error('Cloudflare environment required');
+              return CloudflareLLMService.analyzeContent(params, env);
+            }
+          });
+        }
+        break;
+    }
+
+    return strategies;
+  }
+
+  private static async executeStrategy(
+    strategy: { 
+      name: string; 
+      execute: (params: LLMProcessingParams, env?: any) => Promise<LLMAnalysisResult>; 
+    },
+    params: LLMProcessingParams,
+    env?: any
+  ): Promise<LLMAnalysisResult> {
+    console.log(`[EXECUTE] Starting ${strategy.name} analysis...`);
+    const result = await strategy.execute(params, env);
+    console.log(`[COMPLETE] ${strategy.name} analysis successful`);
+    return result;
   }
 
   private static async analyzeWithGLM(params: LLMProcessingParams): Promise<LLMAnalysisResult> {
