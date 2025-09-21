@@ -1,18 +1,34 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // 生产环境静态导出配置
+  output: 'export',
+  trailingSlash: true,
+  
+  // 图片优化配置（静态导出时需要）
+  images: {
+    unoptimized: true,
+  },
+  
   // 解决开发环境跨域警告
   allowedDevOrigins: ['10.1.0.241'],
-  // 配置API重写，将/api请求代理到后端
+  
+  // 配置API重写，仅在开发环境生效
   async rewrites() {
-    return [
-      {
-        source: '/api/:path*',
-        destination: 'http://localhost:8787/api/:path*',
-      },
-    ];
+    // 仅在开发环境代理API请求
+    if (process.env.NODE_ENV === 'development') {
+      return [
+        {
+          source: '/api/:path*',
+          destination: 'http://localhost:8787/api/:path*',
+        },
+      ];
+    }
+    // 生产环境不重写，直接使用 Cloudflare Workers 地址
+    return [];
   },
-  // 其他配置
+  
+  // 实验性功能
   experimental: {
     // 如果需要其他实验性功能
   },

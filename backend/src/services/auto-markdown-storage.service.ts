@@ -352,29 +352,63 @@ export class AutoMarkdownStorageService {
     entryId?: number;
   }>> {
     try {
-      // 获取用户所有markdown文件
-      const files = await this.r2Service.listUserFiles(userId);
-      
-      // 过滤markdown文件并转换为前端期望的格式
-      const markdownFiles = files
-        .filter(file => file.key.endsWith('.md'))
-        .map(file => {
-          // 从key中提取文件名
-          const fileName = file.key.split('/').pop() || file.key;
-          // 从R2 key生成文件URL路径
-          const filePath = file.key.replace(`user-${userId}/`, '');
-          
-          return {
+      const userConfig = await this.storageConfigService.getUserConfig(userId);
+      const storagePath = (userConfig.storagePath || '').trim();
+      const normalizedPath = storagePath.replace(/^\/+|\/+$/g, '');
+
+      const markdownPattern = /\.(md|markdown|mdx)$/i;
+      console.log(`[AUTO_STORAGE] 用户${userId}配置的存储路径: ${normalizedPath || '(root)'}`);
+      const results: Array<{
+        fileName: string;
+        filePath: string;
+        fileSize: number;
+        createdAt: string;
+        fileUrl?: string;
+        title?: string;
+        entryId?: number;
+      }> = [];
+      const seenPaths = new Set<string>();
+
+      const collectFiles = async (subPath?: string) => {
+        const list = await this.r2Service.listUserFiles(userId, subPath || undefined);
+        console.log(`[AUTO_STORAGE] 路径${subPath || '(root)'} 扫描到 ${list.length} 项`);
+        for (const file of list) {
+          const relativePath = file.key.replace(`user-${userId}/`, '');
+          if (!markdownPattern.test(relativePath)) {
+            continue;
+          }
+          if (seenPaths.has(relativePath)) {
+            continue;
+          }
+          seenPaths.add(relativePath);
+
+          const fileName = relativePath.split('/').pop() || relativePath;
+          const encodedPath = encodeURIComponent(relativePath);
+
+          results.push({
             fileName,
-            filePath,
+            filePath: relativePath,
             fileSize: file.size,
             createdAt: file.lastModified.toISOString(),
-            fileUrl: `/api/user/auto-storage/download/${fileName}`,
-            // TODO: 从文件名或数据库提取标题和条目ID
-          };
-        });
+            fileUrl: `/api/user/auto-storage/download?path=${encodedPath}`
+          });
+        }
+      };
 
-      return markdownFiles;
+      if (normalizedPath) {
+        await collectFiles(normalizedPath);
+      }
+
+      // 兼容历史数据：尝试扫描用户根目录
+      await collectFiles();
+
+      // 按时间倒序返回，最新的文件排在前面
+      const sorted = results.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      console.log(`[AUTO_STORAGE] 用户${userId} 最终可见Markdown文件数量: ${sorted.length}`);
+      if (sorted.length > 0) {
+        console.log(`[AUTO_STORAGE] 示例文件: ${sorted[0].filePath}`);
+      }
+      return sorted;
     } catch (error) {
       console.error(`获取用户${userId}的markdown文件失败:`, error);
       return [];
@@ -401,17 +435,69 @@ export class AutoMarkdownStorageService {
         };
       }
 
-      // 使用R2服务下载文件
-      const result = await this.r2Service.downloadUserFile(userId, fileName);
+      const userConfig = await this.storageConfigService.getUserConfig(userId);
+      const storagePath = (userConfig.storagePath || '').trim().replace(/^\/+|\/+$/g, '');
+      const relativePath = storagePath ? `${storagePath}/${fileName}` : fileName;
+
+      let result = await this.downloadUserMarkdownFileByPath(userId, relativePath);
+
+      if (!result.success && storagePath) {
+        // 回退到根目录以兼容历史存储结构
+        result = await this.downloadUserMarkdownFileByPath(userId, fileName);
+      }
+
+      if (!result.success) {
+        return result;
+      }
+
+      return {
+        success: true,
+        content: result.content,
+        fileSize: result.fileSize
+      };
       
+    } catch (error) {
+      console.error(`下载用户${userId}的markdown文件失败:`, error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : '下载文件失败'
+      };
+    }
+  }
+
+  async downloadUserMarkdownFileByPath(userId: number, relativePath: string): Promise<{
+    success: boolean;
+    content?: string | ArrayBuffer;
+    fileSize?: number;
+    error?: string;
+  }> {
+    try {
+      if (!relativePath) {
+        return { success: false, error: '未提供文件路径' };
+      }
+
+      if (relativePath.includes('..')) {
+        return { success: false, error: '无效的文件路径' };
+      }
+
+      const normalized = relativePath.replace(/^\/+/, '').replace(/\\/g, '/');
+      const segments = normalized.split('/').filter(Boolean);
+      const fileName = segments.pop();
+
+      if (!fileName || !/\.(md|markdown|mdx)$/i.test(fileName)) {
+        return { success: false, error: '不支持的文件类型' };
+      }
+
+      const subPath = segments.join('/');
+      const result = await this.r2Service.downloadUserFile(userId, fileName, subPath || undefined);
+
       return {
         success: true,
         content: result.content,
         fileSize: result.metadata.size
       };
-      
     } catch (error) {
-      console.error(`下载用户${userId}的markdown文件失败:`, error);
+      console.error(`按路径下载用户${userId}的markdown文件失败:`, error);
       return {
         success: false,
         error: error instanceof Error ? error.message : '下载文件失败'

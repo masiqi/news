@@ -247,6 +247,7 @@ export default function MarkdownFilesPage() {
 
       if (response.ok) {
         const data = await response.json();
+        console.log('加载文件列表响应:', data);
         if (data.success) {
           setFiles(data.files || []);
         }
@@ -259,14 +260,18 @@ export default function MarkdownFilesPage() {
   };
 
   // 下载文件
-  const downloadFile = async (fileName: string) => {
+  const downloadFile = async (file: MarkdownFile) => {
     try {
       const token = document.cookie
         .split('; ')
         .find(row => row.startsWith('token='))
         ?.split('=')[1];
 
-      const response = await fetch(`/api/user/auto-storage/download/${fileName}`, {
+      const downloadTarget = file.fileUrl
+        ? file.fileUrl
+        : `/api/user/auto-storage/download?path=${encodeURIComponent(file.filePath)}`;
+
+      const response = await fetch(downloadTarget, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -277,7 +282,7 @@ export default function MarkdownFilesPage() {
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = fileName;
+        a.download = file.fileName;
         document.body.appendChild(a);
         a.click();
         window.URL.revokeObjectURL(url);
@@ -455,7 +460,7 @@ export default function MarkdownFilesPage() {
                           <div>
                             <h3 className="text-sm font-medium text-gray-900 hover:text-indigo-600 cursor-pointer">
                               <button 
-                                onClick={() => downloadFile(file.fileName)}
+                                onClick={() => downloadFile(file)}
                                 className="text-left hover:text-indigo-600 transition-colors"
                               >
                                 {file.fileName}
@@ -470,7 +475,7 @@ export default function MarkdownFilesPage() {
                       </div>
                       <div className="flex items-center space-x-2">
                         <button
-                          onClick={() => downloadFile(file.fileName)}
+                          onClick={() => downloadFile(file)}
                           className="inline-flex items-center px-3 py-1 border border-transparent text-xs font-medium rounded text-white bg-indigo-600 hover:bg-indigo-700"
                         >
                           <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">

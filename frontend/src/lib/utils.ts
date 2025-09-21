@@ -236,3 +236,97 @@ export const session = {
     }
   },
 };
+
+// API 配置
+export const API_CONFIG = {
+  // 开发环境使用本地地址，生产环境使用环境变量或默认 Workers 地址
+  baseURL: process.env.NODE_ENV === 'development' 
+    ? 'http://localhost:8787' 
+    : (process.env.NEXT_PUBLIC_API_URL || 'https://moxiang-distill.workers.dev'),
+  
+  // API 超时时间
+  timeout: 30000,
+  
+  // 重试配置
+  retry: {
+    attempts: 3,
+    delay: 1000,
+  },
+  
+  // 获取完整的 API URL
+  getFullUrl: (path: string): string => {
+    // 如果已经是完整 URL，直接返回
+    if (path.startsWith('http://') || path.startsWith('https://')) {
+      return path;
+    }
+    
+    // 确保 path 以 / 开头
+    const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+    return `${API_CONFIG.baseURL}${normalizedPath}`;
+  },
+  
+  // 通用的 API 请求函数
+  async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+    const url = API_CONFIG.getFullUrl(endpoint);
+    
+    const defaultOptions: RequestInit = {
+      headers: {
+        'Content-Type': 'application/json',
+        ...options.headers,
+      },
+    };
+    
+    // 添加认证令牌
+    if (typeof window !== 'undefined') {
+      const token = localStorage.getItem('token');
+      if (token) {
+        defaultOptions.headers = {
+          ...defaultOptions.headers,
+          Authorization: `Bearer ${token}`,
+        };
+      }
+    }
+    
+    const fetchOptions = { ...defaultOptions, ...options };
+    
+    try {
+      const response = await fetch(url, fetchOptions);
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || `HTTP ${response.status}: ${response.statusText}`);
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error(`API request failed: ${url}`, error);
+      throw error;
+    }
+  },
+  
+  // GET 请求
+  async get<T>(endpoint: string): Promise<T> {
+    return API_CONFIG.request<T>(endpoint, { method: 'GET' });
+  },
+  
+  // POST 请求
+  async post<T>(endpoint: string, data?: any): Promise<T> {
+    return API_CONFIG.request<T>(endpoint, {
+      method: 'POST',
+      body: data ? JSON.stringify(data) : undefined,
+    });
+  },
+  
+  // PUT 请求
+  async put<T>(endpoint: string, data?: any): Promise<T> {
+    return API_CONFIG.request<T>(endpoint, {
+      method: 'PUT',
+      body: data ? JSON.stringify(data) : undefined,
+    });
+  },
+  
+  // DELETE 请求
+  async delete<T>(endpoint: string): Promise<T> {
+    return API_CONFIG.request<T>(endpoint, { method: 'DELETE' });
+  },
+};

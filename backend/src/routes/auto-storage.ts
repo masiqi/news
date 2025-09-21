@@ -457,38 +457,75 @@ autoStorageRoutes.get('/user/auto-storage/download/:fileName', requireAuth, asyn
     const fileName = c.req.param('fileName');
     const { autoStorageService } = initializeServices(c);
 
-    console.log(`下载用户${userId}的markdown文件: ${fileName}`);
-
-    // 验证文件名安全性
-    if (!fileName || !fileName.endsWith('.md') || fileName.includes('../') || fileName.includes('..\\')) {
-      return c.json({
-        success: false,
-        message: '无效的文件名'
-      }, 400);
-    }
+    console.log(`下载用户${userId}的markdown文件(兼容路由): ${fileName}`);
 
     const result = await autoStorageService.downloadUserMarkdownFile(userId, fileName);
 
-    if (!result.success) {
+    if (!result.success || !result.content) {
       return c.json({
         success: false,
         message: result.error || '下载文件失败'
-      }, 500);
+      }, 400);
     }
-
-    // 设置响应头
-    const headers: Record<string, string> = {};
-    headers['Content-Type'] = 'text/markdown; charset=utf-8';
-    headers['Content-Length'] = result.fileSize?.toString() || '0';
-    headers['Content-Disposition'] = `attachment; filename="${encodeURIComponent(fileName)}"`;
 
     return new Response(result.content, {
       status: 200,
-      headers
-    });
+      headers: {
+        'Content-Type': 'text/markdown; charset=utf-8',
+        'Content-Length': result.fileSize?.toString() || '0',
+        'Content-Disposition': `attachment; filename="${encodeURIComponent(fileName)}"`
+      }
+    } as ResponseInit);
 
   } catch (error) {
     console.error('下载用户markdown文件失败:', error);
+    return c.json({
+      success: false,
+      message: '下载文件失败',
+      error: error instanceof Error ? error.message : '未知错误'
+    }, 500);
+  }
+});
+
+autoStorageRoutes.get('/user/auto-storage/download', requireAuth, async (c) => {
+  try {
+    const user = c.get('user');
+    const userId = parseInt(user.id);
+    const pathParam = c.req.query('path');
+    const { autoStorageService } = initializeServices(c);
+
+    console.log(`按路径下载用户${userId}的markdown文件: ${pathParam}`);
+
+    if (!pathParam) {
+      return c.json({
+        success: false,
+        message: '未提供文件路径'
+      }, 400);
+    }
+
+    const decodedPath = decodeURIComponent(pathParam);
+    const result = await autoStorageService.downloadUserMarkdownFileByPath(userId, decodedPath);
+
+    if (!result.success || !result.content) {
+      return c.json({
+        success: false,
+        message: result.error || '下载文件失败'
+      }, 400);
+    }
+
+    const fileName = decodedPath.split('/').pop() || 'markdown.md';
+
+    return new Response(result.content, {
+      status: 200,
+      headers: {
+        'Content-Type': 'text/markdown; charset=utf-8',
+        'Content-Length': result.fileSize?.toString() || '0',
+        'Content-Disposition': `attachment; filename="${encodeURIComponent(fileName)}"`
+      }
+    } as ResponseInit);
+
+  } catch (error) {
+    console.error('按路径下载用户markdown文件失败:', error);
     return c.json({
       success: false,
       message: '下载文件失败',

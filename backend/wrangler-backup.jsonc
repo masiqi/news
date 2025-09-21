@@ -1,0 +1,106 @@
+{
+  "name": "moxiang-distill",
+  "main": "src/index.ts",
+  "compatibility_date": "2024-09-23",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": {
+    "enabled": true
+  },
+  "r2_buckets": [
+    {
+      "binding": "R2_BUCKET",
+      "bucket_name": "news"
+    }
+  ],
+  "vars": {
+    "JWT_SECRET": "development_jwt_secret_key_for_local_testing_only",
+    "ADMIN_USERNAME": "admin",
+    "ADMIN_PASSWORD": "admin123",
+    "DEFAULT_LLM_PROVIDER": "auto",
+    "ENABLE_LLM_FALLBACK": "true"
+  },
+  "assets": {
+    "directory": "./public"
+  },
+  "ai": {
+    "binding": "AI"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "news-db",
+      "database_id": "local"
+    }
+  ],
+  "queues": {
+    "producers": [
+      {
+        "binding": "RSS_FETCHER_QUEUE",
+        "queue": "RSS_FETCHER_QUEUE"
+      },
+      {
+        "binding": "AI_PROCESSOR_QUEUE",
+        "queue": "AI_PROCESSOR_QUEUE"
+      }
+    ],
+    "consumers": [
+      {
+        "queue": "RSS_FETCHER_QUEUE"
+      },
+      {
+        "queue": "AI_PROCESSOR_QUEUE"
+      }
+    ]
+  },
+  "env": {
+    "dev": {
+      "r2_buckets": [
+        {
+          "binding": "R2_BUCKET",
+          "bucket_name": "news",
+          "local_path": "./.r2"
+        }
+      ],
+      "vars": {
+        "JWT_SECRET": "development_jwt_secret_key_for_local_testing_only",
+        "ADMIN_USERNAME": "admin",
+        "ADMIN_PASSWORD": "admin123",
+        "DEFAULT_LLM_PROVIDER": "auto",
+        "ENABLE_LLM_FALLBACK": "true",
+        "ZHIPUAI_API_KEY": "64b344b8a9434851bba8637ebee67db0.qTPcjUmHGiCeGFjY",
+        "OPENROUTER_API_KEY": "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",
+        "NODE_ENV": "development"
+      },
+      "ai": {
+        "binding": "AI"
+      },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "news-db",
+          "database_id": "local"
+        }
+      ],
+      "queues": {
+        "producers": [
+          {
+            "binding": "RSS_FETCHER_QUEUE",
+            "queue": "RSS_FETCHER_QUEUE"
+          },
+          {
+            "binding": "AI_PROCESSOR_QUEUE",
+            "queue": "AI_PROCESSOR_QUEUE"
+          }
+        ],
+        "consumers": [
+          {
+            "queue": "RSS_FETCHER_QUEUE"
+          },
+          {
+            "queue": "AI_PROCESSOR_QUEUE"
+          }
+        ]
+      }
+    }
+  }
+}
