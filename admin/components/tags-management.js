@@ -23,7 +23,7 @@ function getTagsStatsSection() {
     type: 'service',
     api: {
       method: 'get',
-      url: resolveTagsBackendUrl('/admin/tags/statistics'),
+      url: resolveTagsBackendUrl('/admin/tags/aggregation/statistics'),
       headers: buildAuthHeaders(),
       adaptor: function (payload) {
         const data = payload?.data || payload || {};
@@ -96,7 +96,7 @@ function getTopicsTable() {
     type: 'crud',
     api: {
       method: 'get',
-      url: resolveTagsBackendUrl('/admin/tags/topics'),
+      url: resolveTagsBackendUrl('/admin/tags/aggregation/topics'),
       headers: buildAuthHeaders(),
       adaptor: function(payload) {
         const topics = payload?.data?.topics || payload?.topics || [];
@@ -156,7 +156,7 @@ function getTopicsTable() {
                 type: 'form',
                 initApi: {
                   method: 'get',
-                  url: resolveTagsBackendUrl('/admin/tags/topics/${topicName}/detail'),
+                  url: resolveTagsBackendUrl('/admin/tags/aggregation/topics/${topicName}/detail'),
                   headers: buildAuthHeaders()
                 },
                 body: [
@@ -211,7 +211,7 @@ function getKeywordsTable() {
     type: 'crud',
     api: {
       method: 'get',
-      url: resolveTagsBackendUrl('/admin/tags/keywords'),
+      url: resolveTagsBackendUrl('/admin/tags/aggregation/keywords'),
       headers: buildAuthHeaders(),
       adaptor: function(payload) {
         const keywords = payload?.data?.keywords || payload?.keywords || [];
@@ -271,7 +271,7 @@ function getKeywordsTable() {
                 type: 'form',
                 initApi: {
                   method: 'get',
-                  url: resolveTagsBackendUrl('/admin/tags/keywords/${keywordName}/detail'),
+                  url: resolveTagsBackendUrl('/admin/tags/aggregation/keywords/${keywordName}/detail'),
                   headers: buildAuthHeaders()
                 },
                 body: [
@@ -353,7 +353,7 @@ function getTagsPageConfig() {
               },
               api: {
                 method: 'post',
-                url: resolveTagsBackendUrl('/admin/tags/operations'),
+                url: resolveTagsBackendUrl('/admin/tags/aggregation/operations'),
                 headers: buildAuthHeaders()
               },
               body: [
