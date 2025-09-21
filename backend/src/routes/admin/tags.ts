@@ -399,29 +399,31 @@ adminTagsRoutes.get('/aggregation/statistics', async (c) => {
     // 获取今日新增标签
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+    const todayISOString = today.toISOString();
     const [todayTopicsResult] = await db
       .select({ count: sql`count(*)` })
       .from(userTopics)
-      .where(sql`${userTopics.createdAt} >= ${today}`);
+      .where(sql`${userTopics.createdAt} >= ${todayISOString}`);
     
     const [todayKeywordsResult] = await db
       .select({ count: sql`count(*)` })
       .from(userKeywords)
-      .where(sql`${userKeywords.createdAt} >= ${today}`);
+      .where(sql`${userKeywords.createdAt} >= ${todayISOString}`);
     
     // 获取活跃标签数（过去7天有使用的）
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    const sevenDaysAgoISOString = sevenDaysAgo.toISOString();
     
     const [activeTopicsResult] = await db
       .select({ count: sql`count(*)` })
       .from(userTopics)
-      .where(sql`${userTopics.lastUsedAt} >= ${sevenDaysAgo}`);
+      .where(sql`${userTopics.lastUsedAt} >= ${sevenDaysAgoISOString}`);
     
     const [activeKeywordsResult] = await db
       .select({ count: sql`count(*)` })
       .from(userKeywords)
-      .where(sql`${userKeywords.lastUsedAt} >= ${sevenDaysAgo}`);
+      .where(sql`${userKeywords.lastUsedAt} >= ${sevenDaysAgoISOString}`);
 
     const statistics = {
       totalTopics: Number(topicsResult?.count || 0),
