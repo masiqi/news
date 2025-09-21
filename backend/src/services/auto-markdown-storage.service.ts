@@ -343,9 +343,11 @@ export class AutoMarkdownStorageService {
    * 获取用户存储的markdown文件列表
    */
   async getUserMarkdownFiles(userId: number): Promise<Array<{
-    key: string;
-    size: number;
-    lastModified: Date;
+    fileName: string;
+    filePath: string;
+    fileSize: number;
+    createdAt: string;
+    fileUrl?: string;
     title?: string;
     entryId?: number;
   }>> {
@@ -353,20 +355,67 @@ export class AutoMarkdownStorageService {
       // 获取用户所有markdown文件
       const files = await this.r2Service.listUserFiles(userId);
       
-      // 过滤markdown文件并提取元数据
+      // 过滤markdown文件并转换为前端期望的格式
       const markdownFiles = files
         .filter(file => file.key.endsWith('.md'))
-        .map(file => ({
-          key: file.key,
-          size: file.size,
-          lastModified: file.lastModified,
-          // TODO: 从文件名或数据库提取标题和条目ID
-        }));
+        .map(file => {
+          // 从key中提取文件名
+          const fileName = file.key.split('/').pop() || file.key;
+          // 从R2 key生成文件URL路径
+          const filePath = file.key.replace(`user-${userId}/`, '');
+          
+          return {
+            fileName,
+            filePath,
+            fileSize: file.size,
+            createdAt: file.lastModified.toISOString(),
+            fileUrl: `/api/user/auto-storage/download/${fileName}`,
+            // TODO: 从文件名或数据库提取标题和条目ID
+          };
+        });
 
       return markdownFiles;
     } catch (error) {
       console.error(`获取用户${userId}的markdown文件失败:`, error);
       return [];
+    }
+  }
+
+  /**
+   * 下载用户的markdown文件
+   */
+  async downloadUserMarkdownFile(userId: number, fileName: string): Promise<{
+    success: boolean;
+    content?: string | ArrayBuffer;
+    fileSize?: number;
+    error?: string;
+  }> {
+    try {
+      console.log(`下载用户${userId}的markdown文件: ${fileName}`);
+      
+      // 验证文件名安全性
+      if (!fileName || !fileName.endsWith('.md') || fileName.includes('../') || fileName.includes('..\\')) {
+        return {
+          success: false,
+          error: '无效的文件名'
+        };
+      }
+
+      // 使用R2服务下载文件
+      const result = await this.r2Service.downloadUserFile(userId, fileName);
+      
+      return {
+        success: true,
+        content: result.content,
+        fileSize: result.metadata.size
+      };
+      
+    } catch (error) {
+      console.error(`下载用户${userId}的markdown文件失败:`, error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : '下载文件失败'
+      };
     }
   }
 
