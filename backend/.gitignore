@@ -32,6 +32,9 @@ lerna-debug.log*
 # misc
 .DS_Store
 
+# debug scripts
+debug-scripts/
+
 .dev.vars*
 !.dev.vars.example
 .env*

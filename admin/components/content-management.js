@@ -76,7 +76,14 @@ function getContentPageConfig() {
         name: 'webContent', label: '内容', width: 400,
         tpl: '${webContent|substring:0:120}${webContent && webContent.length > 120 ? "..." : "-"}'
       },
-      { name: 'publishedAt', label: '发布时间', type: 'tpl', tpl: '${publishedAt|date:YYYY-MM-DD HH:mm}', width: 140 },
+      {
+        name: 'publishedAt',
+        label: '发布时间',
+        type: 'datetime',
+        format: 'YYYY-MM-DD HH:mm',
+        valueFormat: 'YYYY-MM-DDTHH:mm:ss.SSSZ',
+        width: 160
+      },
       {
         type: 'operation', label: '操作', width: 180,
         buttons: [
@@ -162,7 +169,13 @@ function getContentDetailDialogConfig() {
                 {
                   md: 6,
                   body: [
-                    { type: 'tpl', name: 'publishedAt', label: '发布时间', tpl: '${publishedAt|date:YYYY-MM-DD HH:mm:ss}' },
+                    {
+                      type: 'datetime',
+                      name: 'publishedAt',
+                      label: '发布时间',
+                      format: 'YYYY-MM-DD HH:mm:ss',
+                      valueFormat: 'YYYY-MM-DDTHH:mm:ss.SSSZ'
+                    },
                     { type: 'tpl', name: 'processedAt', label: '处理时间', tpl: '${processedAt|date:YYYY-MM-DD HH:mm:ss}' },
                     { type: 'static', name: 'wordCount', label: '字数' },
                     { type: 'static', name: 'modelUsed', label: '使用模型' },

@@ -1,6 +1,5 @@
 /**
  * Markdown管理模块组件
- * 提供管理员对生成的Markdown文件进行查看、过滤、导出和重建等操作
  */
 
 function resolveMarkdownBackendUrl(path) {
@@ -22,7 +21,7 @@ function getMarkdownStatsSection() {
       method: 'get',
       url: resolveMarkdownBackendUrl('/admin/markdown/stats'),
       headers: buildAuthHeaders(),
-      adaptor: function (payload, response) {
+      adaptor: function (payload) {
         const data = payload?.data || payload || {};
         return {
           status: payload?.success === false ? 1 : 0,
@@ -38,33 +37,45 @@ function getMarkdownStatsSection() {
           {
             md: 3,
             body: {
-              type: 'statistic',
-              label: '总条目',
-              value: '${overview.totalEntries || 0}'
+              type: 'panel',
+              title: '总条目',
+              body: {
+                type: 'tpl',
+                tpl: '<div class="display-6">${overview.totalEntries || 0}</div>'
+              }
             }
           },
           {
             md: 3,
             body: {
-              type: 'statistic',
-              label: '已有Markdown',
-              value: '${overview.withMarkdown || 0}'
+              type: 'panel',
+              title: '已有Markdown',
+              body: {
+                type: 'tpl',
+                tpl: '<div class="display-6 text-success">${overview.withMarkdown || 0}</div>'
+              }
             }
           },
           {
             md: 3,
             body: {
-              type: 'statistic',
-              label: '待生成',
-              value: '${overview.withoutMarkdown || 0}'
+              type: 'panel',
+              title: '待生成',
+              body: {
+                type: 'tpl',
+                tpl: '<div class="display-6 text-warning">${overview.withoutMarkdown || 0}</div>'
+              }
             }
           },
           {
             md: 3,
             body: {
-              type: 'statistic',
-              label: '平均字数',
-              value: '${(overview.avgWordCount || 0) | round:0}'
+              type: 'panel',
+              title: '平均字数',
+              body: {
+                type: 'tpl',
+                tpl: '<div class="display-6">${(overview.avgWordCount || 0) | round:0}</div>'
+              }
             }
           }
         ]
@@ -77,17 +88,19 @@ function getMarkdownStatsSection() {
             body: {
               type: 'panel',
               title: '按来源统计',
-              body: {
-                type: 'table',
-                source: '${sourceStats}',
-                columns: [
-                  { name: 'sourceName', label: '来源', placeholder: '未知来源' },
-                  { name: 'totalEntries', label: '总条目' },
-                  { name: 'withMarkdown', label: '已有Markdown' },
-                  { name: 'avgWordCount', label: '平均字数', tpl: '${avgWordCount | round:0}' }
-                ],
-                placeholder: '暂无数据'
-              }
+              body: [
+                {
+                  type: 'table',
+                  source: '${sourceStats}',
+                  columns: [
+                    { name: 'sourceName', label: '来源', placeholder: '未知来源' },
+                    { name: 'totalEntries', label: '总条目' },
+                    { name: 'withMarkdown', label: '已有Markdown' },
+                    { name: 'avgWordCount', label: '平均字数', tpl: '${avgWordCount | round:0}' }
+                  ],
+                  placeholder: '暂无数据'
+                }
+              ]
             }
           },
           {
@@ -95,34 +108,21 @@ function getMarkdownStatsSection() {
             body: {
               type: 'panel',
               title: '最近30天生成趋势',
-              body: {
-                type: 'table',
-                source: '${dateStats}',
-                columns: [
-                  { name: 'date', label: '日期' },
-                  { name: 'count', label: '生成数量' },
-                  { name: 'wordCount', label: '累积字数' }
-                ],
-                placeholder: '暂无统计数据'
-              }
+              body: [
+                {
+                  type: 'table',
+                  source: '${dateStats}',
+                  columns: [
+                    { name: 'date', label: '日期' },
+                    { name: 'count', label: '生成数量' },
+                    { name: 'wordCount', label: '累积字数' }
+                  ],
+                  placeholder: '暂无统计数据'
+                }
+              ]
             }
           }
         ]
-      },
-      {
-        type: 'panel',
-        title: '热门内容（字数排序）',
-        body: {
-          type: 'table',
-          source: '${popularContent}',
-          columns: [
-            { name: 'title', label: '标题', tpl: '<span class="font-semibold">${title}</span>' },
-            { name: 'sourceName', label: '来源' },
-            { name: 'wordCount', label: '字数' },
-            { name: 'topics', label: '主题', tpl: '${topics && topics.length ? topics.join("、") : "-"}' }
-          ],
-          placeholder: '暂无热门内容'
-        }
       }
     ]
   };
@@ -132,6 +132,7 @@ function getMarkdownCrudSection() {
   return {
     type: 'crud',
     syncLocation: false,
+    primaryField: 'id',
     api: {
       method: 'get',
       url: resolveMarkdownBackendUrl('/admin/markdown/list'),
@@ -159,7 +160,6 @@ function getMarkdownCrudSection() {
     },
     pageField: 'page',
     perPageField: 'pageSize',
-    keepItemSelectionOnPageChange: true,
     headerToolbar: [
       'filter-toggler',
       'bulkActions',
@@ -240,14 +240,14 @@ function getMarkdownCrudSection() {
     ],
     columns: [
       {
-        type: 'checkbox',
-        name: 'id'
-      },
-      {
         name: 'title',
         label: '标题',
-        width: 250,
-        tpl: '<div class="font-semibold">${title}</div><div class="text-xs text-muted">${sourceName || "未知来源"}</div>'
+        width: 320,
+        tpl: '${title}'
+      },
+      {
+        name: 'sourceName',
+        label: '来源'
       },
       {
         name: 'hasMarkdown',
@@ -271,12 +271,13 @@ function getMarkdownCrudSection() {
       {
         type: 'operation',
         label: '操作',
-        width: 200,
+        width: 160,
         buttons: [
           {
-            label: '查看',
             type: 'button',
             level: 'link',
+            icon: 'fa fa-eye',
+            tooltip: '查看详情',
             actionType: 'dialog',
             dialog: {
               title: 'Markdown详情',
@@ -372,9 +373,10 @@ function getMarkdownCrudSection() {
             }
           },
           {
-            label: '重新生成',
             type: 'button',
-            level: 'primary',
+            level: 'link',
+            icon: 'fa fa-refresh',
+            tooltip: '重新生成',
             actionType: 'ajax',
             api: {
               method: 'post',
@@ -384,9 +386,10 @@ function getMarkdownCrudSection() {
             reload: true
           },
           {
-            label: '删除Markdown',
             type: 'button',
-            level: 'danger',
+            level: 'link',
+            icon: 'fa fa-trash',
+            tooltip: '删除Markdown',
             confirmText: '仅删除Markdown内容，原始条目将保留。确定继续？',
             actionType: 'ajax',
             api: {
