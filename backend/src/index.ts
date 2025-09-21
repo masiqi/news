@@ -25,6 +25,9 @@ import statusRoutes from "./routes/api-status";
 import monitoringRoutes from "./routes/monitoring";
 import aiRoutes from "./routes/ai";
 import systemMonitorRoutes from "./routes/system-monitor";
+import topicsManagementRoutes from "./routes/topics-management";
+import keywordsManagementRoutes from "./routes/keywords-management";
+import contentTagsRoutes from "./routes/content-tags";
 // 暂时注释掉GLM路由，因为有导入错误
 // import glmRoutes from "./routes/glm";
 // 移除测试路由导入
@@ -77,6 +80,15 @@ app.route("/api/content", reprocessRoutes);
 
 // 注册标签聚合路由
 app.route("/api/tags", tagsRoutes);
+
+// 注册主题管理API路由
+app.route("/api/topics-management", topicsManagementRoutes);
+
+// 注册关键词管理API路由
+app.route("/api/keywords-management", keywordsManagementRoutes);
+
+// 注册内容标签API路由
+app.route("/api/content-tags", contentTagsRoutes);
 
 // 注册管理员API路由
 app.route("/admin", adminRoutes);
