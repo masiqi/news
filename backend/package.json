@@ -1,5 +1,5 @@
 {
-	"name": "backend",
+	"name": "moxiang-distill-backend",
 	"type": "module",
 	"scripts": {
 		"dev": "wrangler dev",
