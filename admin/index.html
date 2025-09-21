@@ -84,6 +84,7 @@
                     '/components/user-management.js',
                     '/components/rss-management.js',
                     '/components/content-management.js',
+                    '/components/markdown-management.js',
                     '/components/system-monitor.js'
                 ];
                 
@@ -375,15 +376,18 @@
             }
         }
 
-        // 简单的Markdown管理页面
+        // Markdown管理页面：如模块已加载则委托给模块
         function getMarkdownPageConfig() {
+            if (window.MarkdownComponents && typeof window.MarkdownComponents.getMarkdownPageConfig === 'function') {
+                return window.MarkdownComponents.getMarkdownPageConfig();
+            }
             return {
                 type: 'page',
                 title: 'Markdown管理',
                 body: {
                     type: 'alert',
                     level: 'info',
-                    body: 'Markdown管理功能正在开发中...'
+                    body: 'Markdown管理模块加载中，请稍后重试...'
                 }
             };
         }
