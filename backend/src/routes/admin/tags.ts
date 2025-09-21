@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { adminAuthMiddleware, adminAuditMiddleware, getCurrentUser } from '../../middleware/admin-auth.middleware';
 import { initDB } from '../../db/index';
-import { sourceTags, sourceTagRelations } from '../../db/schema';
+import { sourceTags, sourceTagRelations, userTopics, userKeywords, rssEntries, topicEntryRelations, keywordEntryRelations, processedContents, sources } from '../../db/schema';
 import { tagAggregationService } from '../../services/tag-aggregation.service';
 import { eq, and, or, like, desc, asc, sql } from 'drizzle-orm';
 
@@ -391,23 +391,23 @@ adminTagsRoutes.get('/aggregation/statistics', async (c) => {
     const db = initDB(c.env.DB);
     
     // 获取总主题数
-    const [topicsResult] = await db.select({ count: sql`count(*)` }).from(db.schema.userTopics);
+    const [topicsResult] = await db.select({ count: sql`count(*)` }).from(userTopics);
     
     // 获取总关键词数
-    const [keywordsResult] = await db.select({ count: sql`count(*)` }).from(db.schema.userKeywords);
+    const [keywordsResult] = await db.select({ count: sql`count(*)` }).from(userKeywords);
     
     // 获取今日新增标签
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const [todayTopicsResult] = await db
       .select({ count: sql`count(*)` })
-      .from(db.schema.userTopics)
-      .where(sql`${db.schema.userTopics.createdAt} >= ${today}`);
+      .from(userTopics)
+      .where(sql`${userTopics.createdAt} >= ${today}`);
     
     const [todayKeywordsResult] = await db
       .select({ count: sql`count(*)` })
-      .from(db.schema.userKeywords)
-      .where(sql`${db.schema.userKeywords.createdAt} >= ${today}`);
+      .from(userKeywords)
+      .where(sql`${userKeywords.createdAt} >= ${today}`);
     
     // 获取活跃标签数（过去7天有使用的）
     const sevenDaysAgo = new Date();
@@ -415,13 +415,13 @@ adminTagsRoutes.get('/aggregation/statistics', async (c) => {
     
     const [activeTopicsResult] = await db
       .select({ count: sql`count(*)` })
-      .from(db.schema.userTopics)
-      .where(sql`${db.schema.userTopics.lastUsedAt} >= ${sevenDaysAgo}`);
+      .from(userTopics)
+      .where(sql`${userTopics.lastUsedAt} >= ${sevenDaysAgo}`);
     
     const [activeKeywordsResult] = await db
       .select({ count: sql`count(*)` })
-      .from(db.schema.userKeywords)
-      .where(sql`${db.schema.userKeywords.lastUsedAt} >= ${sevenDaysAgo}`);
+      .from(userKeywords)
+      .where(sql`${userKeywords.lastUsedAt} >= ${sevenDaysAgo}`);
 
     const statistics = {
       totalTopics: Number(topicsResult?.count || 0),
@@ -448,14 +448,14 @@ adminTagsRoutes.get('/aggregation/topics', async (c) => {
     
     let query = db
       .select()
-      .from(db.schema.userTopics)
-      .orderBy(desc(db.schema.userTopics.entryCount))
+      .from(userTopics)
+      .orderBy(desc(userTopics.entryCount))
       .limit(parseInt(limit))
       .offset(parseInt(offset));
     
     // 搜索过滤
     if (search) {
-      query = query.where(like(db.schema.userTopics.topicName, `%${search}%`));
+      query = query.where(like(userTopics.topicName, `%${search}%`));
     }
     
     const topics = await query;
@@ -478,14 +478,14 @@ adminTagsRoutes.get('/aggregation/keywords', async (c) => {
     
     let query = db
       .select()
-      .from(db.schema.userKeywords)
-      .orderBy(desc(db.schema.userKeywords.entryCount))
+      .from(userKeywords)
+      .orderBy(desc(userKeywords.entryCount))
       .limit(parseInt(limit))
       .offset(parseInt(offset));
     
     // 搜索过滤
     if (search) {
-      query = query.where(like(db.schema.userKeywords.keywordName, `%${search}%`));
+      query = query.where(like(userKeywords.keywordName, `%${search}%`));
     }
     
     const keywords = await query;
@@ -508,8 +508,8 @@ adminTagsRoutes.get('/aggregation/topics/:topicName/detail', async (c) => {
     
     const [topic] = await db
       .select()
-      .from(db.schema.userTopics)
-      .where(eq(db.schema.userTopics.topicName, topicName))
+      .from(userTopics)
+      .where(eq(userTopics.topicName, topicName))
       .limit(1);
     
     if (!topic) {
@@ -519,14 +519,14 @@ adminTagsRoutes.get('/aggregation/topics/:topicName/detail', async (c) => {
     // 获取相关条目示例
     const relatedEntries = await db
       .select({
-        id: db.schema.rssEntries.id,
-        title: db.schema.rssEntries.title,
-        link: db.schema.rssEntries.link,
-        publishedAt: db.schema.rssEntries.publishedAt
+        id: rssEntries.id,
+        title: rssEntries.title,
+        link: rssEntries.link,
+        publishedAt: rssEntries.publishedAt
       })
-      .from(db.schema.topicEntryRelations)
-      .innerJoin(db.schema.rssEntries, eq(db.schema.topicEntryRelations.entryId, db.schema.rssEntries.id))
-      .where(eq(db.schema.topicEntryRelations.topicId, topic.id))
+      .from(topicEntryRelations)
+      .innerJoin(rssEntries, eq(topicEntryRelations.entryId, rssEntries.id))
+      .where(eq(topicEntryRelations.topicId, topic.id))
       .limit(5);
     
     return c.json({
@@ -550,8 +550,8 @@ adminTagsRoutes.get('/aggregation/keywords/:keywordName/detail', async (c) => {
     
     const [keyword] = await db
       .select()
-      .from(db.schema.userKeywords)
-      .where(eq(db.schema.userKeywords.keywordName, keywordName))
+      .from(userKeywords)
+      .where(eq(userKeywords.keywordName, keywordName))
       .limit(1);
     
     if (!keyword) {
@@ -561,14 +561,14 @@ adminTagsRoutes.get('/aggregation/keywords/:keywordName/detail', async (c) => {
     // 获取相关条目示例
     const relatedEntries = await db
       .select({
-        id: db.schema.rssEntries.id,
-        title: db.schema.rssEntries.title,
-        link: db.schema.rssEntries.link,
-        publishedAt: db.schema.rssEntries.publishedAt
+        id: rssEntries.id,
+        title: rssEntries.title,
+        link: rssEntries.link,
+        publishedAt: rssEntries.publishedAt
       })
-      .from(db.schema.keywordEntryRelations)
-      .innerJoin(db.schema.rssEntries, eq(db.schema.keywordEntryRelations.entryId, db.schema.rssEntries.id))
-      .where(eq(db.schema.keywordEntryRelations.keywordId, keyword.id))
+      .from(keywordEntryRelations)
+      .innerJoin(rssEntries, eq(keywordEntryRelations.entryId, rssEntries.id))
+      .where(eq(keywordEntryRelations.keywordId, keyword.id))
       .limit(5);
     
     return c.json({
@@ -598,11 +598,11 @@ adminTagsRoutes.post('/aggregation/operations', async (c) => {
         if (userId) {
           // 为指定用户重新聚合
           const contents = await db
-            .select({ id: db.schema.processedContents.id })
-            .from(db.schema.processedContents)
-            .innerJoin(db.schema.rssEntries, eq(db.schema.processedContents.entryId, db.schema.rssEntries.id))
-            .innerJoin(db.schema.sources, eq(db.schema.rssEntries.sourceId, db.schema.sources.id))
-            .where(eq(db.schema.sources.userId, parseInt(userId)));
+            .select({ id: processedContents.id })
+            .from(processedContents)
+            .innerJoin(rssEntries, eq(processedContents.entryId, rssEntries.id))
+            .innerJoin(sources, eq(rssEntries.sourceId, sources.id))
+            .where(eq(sources.userId, parseInt(userId)));
           
           let successCount = 0;
           for (const content of contents) {
@@ -624,13 +624,13 @@ adminTagsRoutes.post('/aggregation/operations', async (c) => {
       case 'cleanup':
         // 清理无效标签（entryCount为0的标签）
         const [deletedTopics] = await db
-          .delete(db.schema.userTopics)
-          .where(eq(db.schema.userTopics.entryCount, 0))
+          .delete(userTopics)
+          .where(eq(userTopics.entryCount, 0))
           .then(() => [{ count: '清理完成' }]);
         
         const [deletedKeywords] = await db
-          .delete(db.schema.userKeywords)
-          .where(eq(db.schema.userKeywords.entryCount, 0))
+          .delete(userKeywords)
+          .where(eq(userKeywords.entryCount, 0))
           .then(() => [{ count: '清理完成' }]);
         
         result = { topics: deletedTopics, keywords: deletedKeywords };
