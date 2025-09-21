@@ -12,6 +12,7 @@ function getNavigationConfig() {
         { label: '首页', to: '#/home', icon: 'fa fa-home' },
         { label: '用户管理', to: '#/users', icon: 'fa fa-users' },
         { label: 'RSS源管理', to: '#/sources', icon: 'fa fa-rss' },
+        { label: 'Markdown管理', to: '#/markdown', icon: 'fa fa-file-code-o' },
         { label: '内容管理', to: '#/content', icon: 'fa fa-newspaper-o' },
         { label: '系统监控', to: '#/monitor', icon: 'fa fa-tachometer' }
     ].map(item => ({ ...item, active: item.to === current }));
