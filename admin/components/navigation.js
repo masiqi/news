@@ -14,6 +14,7 @@ function getNavigationConfig() {
         { label: 'RSS源管理', to: '#/sources', icon: 'fa fa-rss' },
         { label: 'Markdown管理', to: '#/markdown', icon: 'fa fa-file-code-o' },
         { label: '内容管理', to: '#/content', icon: 'fa fa-newspaper-o' },
+        { label: '标签管理', to: '#/tags', icon: 'fa fa-tags' },
         { label: '系统监控', to: '#/monitor', icon: 'fa fa-tachometer' }
     ].map(item => ({ ...item, active: item.to === current }));
 

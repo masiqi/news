@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { adminAuthMiddleware, adminAuditMiddleware, getCurrentUser } from '../../middleware/admin-auth.middleware';
 import { initDB } from '../../db/index';
 import { sourceTags, sourceTagRelations } from '../../db/schema';
+import { tagAggregationService } from '../../services/tag-aggregation.service';
 import { eq, and, or, like, desc, asc, sql } from 'drizzle-orm';
 
 const adminTagsRoutes = new Hono<{ Bindings: CloudflareBindings }>();
@@ -379,6 +380,288 @@ adminTagsRoutes.patch('/batch-update-usage', async (c) => {
   } catch (error) {
     console.error('批量更新标签使用量失败:', error);
     return c.json({ error: '批量更新标签使用量失败' }, 500);
+  }
+});
+
+// ===== 标签聚合系统管理端点 =====
+
+// 获取标签统计信息
+adminTagsRoutes.get('/aggregation/statistics', async (c) => {
+  try {
+    const db = initDB(c.env.DB);
+    
+    // 获取总主题数
+    const [topicsResult] = await db.select({ count: sql`count(*)` }).from(db.schema.userTopics);
+    
+    // 获取总关键词数
+    const [keywordsResult] = await db.select({ count: sql`count(*)` }).from(db.schema.userKeywords);
+    
+    // 获取今日新增标签
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const [todayTopicsResult] = await db
+      .select({ count: sql`count(*)` })
+      .from(db.schema.userTopics)
+      .where(sql`${db.schema.userTopics.createdAt} >= ${today}`);
+    
+    const [todayKeywordsResult] = await db
+      .select({ count: sql`count(*)` })
+      .from(db.schema.userKeywords)
+      .where(sql`${db.schema.userKeywords.createdAt} >= ${today}`);
+    
+    // 获取活跃标签数（过去7天有使用的）
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    
+    const [activeTopicsResult] = await db
+      .select({ count: sql`count(*)` })
+      .from(db.schema.userTopics)
+      .where(sql`${db.schema.userTopics.lastUsedAt} >= ${sevenDaysAgo}`);
+    
+    const [activeKeywordsResult] = await db
+      .select({ count: sql`count(*)` })
+      .from(db.schema.userKeywords)
+      .where(sql`${db.schema.userKeywords.lastUsedAt} >= ${sevenDaysAgo}`);
+
+    const statistics = {
+      totalTopics: Number(topicsResult?.count || 0),
+      totalKeywords: Number(keywordsResult?.count || 0),
+      todayNewTags: Number(todayTopicsResult?.count || 0) + Number(todayKeywordsResult?.count || 0),
+      activeTags: Number(activeTopicsResult?.count || 0) + Number(activeKeywordsResult?.count || 0)
+    };
+    
+    return c.json({
+      success: true,
+      data: statistics
+    });
+  } catch (error) {
+    console.error('获取标签统计失败:', error);
+    return c.json({ error: '获取标签统计失败' }, 500);
+  }
+});
+
+// 获取主题列表
+adminTagsRoutes.get('/aggregation/topics', async (c) => {
+  try {
+    const { search, limit = '50', offset = '0' } = c.req.query();
+    const db = initDB(c.env.DB);
+    
+    let query = db
+      .select()
+      .from(db.schema.userTopics)
+      .orderBy(desc(db.schema.userTopics.entryCount))
+      .limit(parseInt(limit))
+      .offset(parseInt(offset));
+    
+    // 搜索过滤
+    if (search) {
+      query = query.where(like(db.schema.userTopics.topicName, `%${search}%`));
+    }
+    
+    const topics = await query;
+    
+    return c.json({
+      success: true,
+      data: { topics }
+    });
+  } catch (error) {
+    console.error('获取主题列表失败:', error);
+    return c.json({ error: '获取主题列表失败' }, 500);
+  }
+});
+
+// 获取关键词列表
+adminTagsRoutes.get('/aggregation/keywords', async (c) => {
+  try {
+    const { search, limit = '50', offset = '0' } = c.req.query();
+    const db = initDB(c.env.DB);
+    
+    let query = db
+      .select()
+      .from(db.schema.userKeywords)
+      .orderBy(desc(db.schema.userKeywords.entryCount))
+      .limit(parseInt(limit))
+      .offset(parseInt(offset));
+    
+    // 搜索过滤
+    if (search) {
+      query = query.where(like(db.schema.userKeywords.keywordName, `%${search}%`));
+    }
+    
+    const keywords = await query;
+    
+    return c.json({
+      success: true,
+      data: { keywords }
+    });
+  } catch (error) {
+    console.error('获取关键词列表失败:', error);
+    return c.json({ error: '获取关键词列表失败' }, 500);
+  }
+});
+
+// 获取主题详情
+adminTagsRoutes.get('/aggregation/topics/:topicName/detail', async (c) => {
+  try {
+    const topicName = decodeURIComponent(c.req.param('topicName'));
+    const db = initDB(c.env.DB);
+    
+    const [topic] = await db
+      .select()
+      .from(db.schema.userTopics)
+      .where(eq(db.schema.userTopics.topicName, topicName))
+      .limit(1);
+    
+    if (!topic) {
+      return c.json({ error: '主题不存在' }, 404);
+    }
+    
+    // 获取相关条目示例
+    const relatedEntries = await db
+      .select({
+        id: db.schema.rssEntries.id,
+        title: db.schema.rssEntries.title,
+        link: db.schema.rssEntries.link,
+        publishedAt: db.schema.rssEntries.publishedAt
+      })
+      .from(db.schema.topicEntryRelations)
+      .innerJoin(db.schema.rssEntries, eq(db.schema.topicEntryRelations.entryId, db.schema.rssEntries.id))
+      .where(eq(db.schema.topicEntryRelations.topicId, topic.id))
+      .limit(5);
+    
+    return c.json({
+      success: true,
+      data: {
+        ...topic,
+        relatedEntries
+      }
+    });
+  } catch (error) {
+    console.error('获取主题详情失败:', error);
+    return c.json({ error: '获取主题详情失败' }, 500);
+  }
+});
+
+// 获取关键词详情
+adminTagsRoutes.get('/aggregation/keywords/:keywordName/detail', async (c) => {
+  try {
+    const keywordName = decodeURIComponent(c.req.param('keywordName'));
+    const db = initDB(c.env.DB);
+    
+    const [keyword] = await db
+      .select()
+      .from(db.schema.userKeywords)
+      .where(eq(db.schema.userKeywords.keywordName, keywordName))
+      .limit(1);
+    
+    if (!keyword) {
+      return c.json({ error: '关键词不存在' }, 404);
+    }
+    
+    // 获取相关条目示例
+    const relatedEntries = await db
+      .select({
+        id: db.schema.rssEntries.id,
+        title: db.schema.rssEntries.title,
+        link: db.schema.rssEntries.link,
+        publishedAt: db.schema.rssEntries.publishedAt
+      })
+      .from(db.schema.keywordEntryRelations)
+      .innerJoin(db.schema.rssEntries, eq(db.schema.keywordEntryRelations.entryId, db.schema.rssEntries.id))
+      .where(eq(db.schema.keywordEntryRelations.keywordId, keyword.id))
+      .limit(5);
+    
+    return c.json({
+      success: true,
+      data: {
+        ...keyword,
+        relatedEntries
+      }
+    });
+  } catch (error) {
+    console.error('获取关键词详情失败:', error);
+    return c.json({ error: '获取关键词详情失败' }, 500);
+  }
+});
+
+// 标签操作（重新聚合、清理等）
+adminTagsRoutes.post('/aggregation/operations', async (c) => {
+  try {
+    const { operation, userId, reason } = await c.req.json();
+    const db = initDB(c.env.DB);
+    
+    let result;
+    
+    switch (operation) {
+      case 'reaggregate':
+        // 重新聚合指定用户或所有用户的标签
+        if (userId) {
+          // 为指定用户重新聚合
+          const contents = await db
+            .select({ id: db.schema.processedContents.id })
+            .from(db.schema.processedContents)
+            .innerJoin(db.schema.rssEntries, eq(db.schema.processedContents.entryId, db.schema.rssEntries.id))
+            .innerJoin(db.schema.sources, eq(db.schema.rssEntries.sourceId, db.schema.sources.id))
+            .where(eq(db.schema.sources.userId, parseInt(userId)));
+          
+          let successCount = 0;
+          for (const content of contents) {
+            try {
+              await tagAggregationService.processContentTags(content.id, db);
+              successCount++;
+            } catch (error) {
+              console.error(`重新聚合内容失败: ${content.id}`, error);
+            }
+          }
+          
+          result = { successCount, total: contents.length };
+        } else {
+          // 为所有用户重新聚合（简化版本）
+          result = { message: '全量重新聚合功能开发中，请指定具体用户ID' };
+        }
+        break;
+        
+      case 'cleanup':
+        // 清理无效标签（entryCount为0的标签）
+        const [deletedTopics] = await db
+          .delete(db.schema.userTopics)
+          .where(eq(db.schema.userTopics.entryCount, 0))
+          .then(() => [{ count: '清理完成' }]);
+        
+        const [deletedKeywords] = await db
+          .delete(db.schema.userKeywords)
+          .where(eq(db.schema.userKeywords.entryCount, 0))
+          .then(() => [{ count: '清理完成' }]);
+        
+        result = { topics: deletedTopics, keywords: deletedKeywords };
+        break;
+        
+      case 'statistics':
+        // 重新统计标签使用情况
+        result = { message: '统计功能开发中' };
+        break;
+        
+      default:
+        return c.json({ error: '不支持的操作类型' }, 400);
+    }
+    
+    // 记录操作日志
+    const currentUser = getCurrentUser(c);
+    console.log(`[ADMIN] 标签操作: ${operation} by ${currentUser?.email || 'admin'}`, {
+      operation,
+      userId,
+      reason,
+      result
+    });
+    
+    return c.json({
+      success: true,
+      data: result,
+      operation
+    });
+  } catch (error) {
+    console.error('标签操作失败:', error);
+    return c.json({ error: '标签操作失败' }, 500);
   }
 });
 

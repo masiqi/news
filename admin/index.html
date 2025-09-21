@@ -85,6 +85,7 @@
                     '/components/rss-management.js',
                     '/components/content-management.js',
                     '/components/markdown-management.js',
+                    '/components/tags-management.js',
                     '/components/system-monitor.js'
                 ];
                 
@@ -356,6 +357,11 @@
                       ? window.ContentComponents.getContentPageConfig()
                       : getContentPageConfig();
                     break;
+                case '/tags':
+                    schema = (window.TagsComponents && window.TagsComponents.getTagsPageConfig)
+                      ? window.TagsComponents.getTagsPageConfig()
+                      : getTagsPageConfig();
+                    break;
                 case '/monitor':
                     schema = (window.SystemMonitor && window.SystemMonitor.createMonitorPage)
                       ? window.SystemMonitor.createMonitorPage()
@@ -420,6 +426,22 @@
                     type: 'alert',
                     level: 'info',
                     body: '系统监控模块加载中，请稍后重试...'
+                }
+            };
+        }
+
+        // 标签管理页面占位：如模块已加载则委托给模块
+        function getTagsPageConfig() {
+            if (window.TagsComponents && typeof window.TagsComponents.getTagsPageConfig === 'function') {
+                return window.TagsComponents.getTagsPageConfig();
+            }
+            return {
+                type: 'page',
+                title: '标签管理',
+                body: {
+                    type: 'alert',
+                    level: 'info',
+                    body: '标签管理模块加载中，请稍后重试...'
                 }
             };
         }
