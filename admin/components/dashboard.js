@@ -95,10 +95,22 @@ function getHomePageConfig() {
                                     url: resolveDashboardBackendUrl('/admin/users/recent'),
                                     headers: {
                                         'Authorization': 'Bearer ' + localStorage.getItem('admin_token')
+                                    },
+                                    adaptor: function(payload) {
+                                        const users = payload?.data?.users || payload?.users || [];
+                                        return {
+                                            status: payload?.success === false ? 1 : 0,
+                                            msg: payload?.error || '',
+                                            data: {
+                                                items: users
+                                            }
+                                        };
                                     }
                                 },
                                 body: {
                                     type: 'table',
+                                    source: '${items}',
+                                    placeholder: '暂无最近活动',
                                     columns: [
                                         {
                                             name: 'email',
@@ -136,10 +148,22 @@ function getHomePageConfig() {
                                     url: resolveDashboardBackendUrl('/admin/system/logs'),
                                     headers: {
                                         'Authorization': 'Bearer ' + localStorage.getItem('admin_token')
+                                    },
+                                    adaptor: function(payload) {
+                                        const logs = payload?.data?.logs || payload?.logs || [];
+                                        return {
+                                            status: payload?.success === false ? 1 : 0,
+                                            msg: payload?.error || '',
+                                            data: {
+                                                items: logs
+                                            }
+                                        };
                                     }
                                 },
                                 body: {
                                     type: 'table',
+                                    source: '${items}',
+                                    placeholder: '暂无系统日志',
                                     columns: [
                                         {
                                             name: 'level',

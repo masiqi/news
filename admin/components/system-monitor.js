@@ -33,37 +33,77 @@ class SystemMonitor {
                                     url: resolveMonitorBackendUrl('/api/admin/system/status'),
                                     method: 'get',
                                     adaptor: function(payload) {
+                                        const data = payload || {};
+                                        const components = data.components || {};
+                                        const componentRows = Object.keys(components).map(function(key) {
+                                            const info = components[key] || {};
+                                            const nameMap = {
+                                                rssSources: 'RSS源',
+                                                contentProcessing: '内容处理',
+                                                recentActivity: '近期活动'
+                                            };
+                                            const detailParts = [];
+                                            Object.keys(info).forEach(function(field) {
+                                                if (typeof info[field] === 'number' || typeof info[field] === 'string') {
+                                                    if (field !== 'health') {
+                                                        detailParts.push(field + ': ' + info[field]);
+                                                    }
+                                                }
+                                            });
+                                            return {
+                                                key,
+                                                name: nameMap[key] || key,
+                                                details: detailParts.join('，') || '- ',
+                                                health: info.health || 'unknown'
+                                            };
+                                        });
                                         return {
-                                            status: payload.status === 'healthy' ? 0 : 1,
-                                            msg: payload.status === 'healthy' ? '系统正常' : '系统异常',
-                                            data: payload
+                                            status: data.status === 'healthy' ? 0 : 0,
+                                            data: {
+                                                statusText: data.status || 'unknown',
+                                                checkTime: data.checkTime,
+                                                uptime: data.uptime,
+                                                performance: data.performance,
+                                                componentRows
+                                            }
                                         };
                                     }
                                 },
                                 body: [
                                     {
-                                        type: 'tpl',
-                                        tpl: '系统总览',
-                                        wrapperComponent: 'h2'
-                                    },
-                                    {
-                                        type: 'status',
-                                        name: 'status'
-                                    },
-                                    {
-                                        type: 'tpl',
-                                        tpl: '${msg}'
-                                    },
-                                    {
-                                        type: 'divider'
-                                    },
-                                    {
-                                        type: 'tpl',
-                                        tpl: '检查时间: ${data.checkTime}'
-                                    },
-                                    {
-                                        type: 'tpl',
-                                        tpl: '运行时间: ${data.uptime}'
+                                        type: 'grid',
+                                        columns: [
+                                            {
+                                                md: 4,
+                                                body: {
+                                                    type: 'tpl',
+                                                    tpl: '<div class="text-muted mb-2">系统状态</div><div class="display-6 ${statusText === "healthy" ? "text-success" : statusText === "warning" ? "text-warning" : "text-muted"}">${statusText}</div><div class="text-xs text-muted">检查时间：${checkTime | date:YYYY-MM-DD HH:mm}</div><div class="text-xs text-muted">运行时间：${uptime || "-"}</div>'
+                                                }
+                                            },
+                                            {
+                                                md: 8,
+                                                body: {
+                                                    type: 'table',
+                                                    source: '${componentRows}',
+                                                    columns: [
+                                                        { name: 'name', label: '组件' },
+                                                        { name: 'details', label: '详情' },
+                                                        {
+                                                            name: 'health',
+                                                            label: '状态',
+                                                            type: 'mapping',
+                                                            map: {
+                                                                healthy: '<span class="badge badge-success">正常</span>',
+                                                                warning: '<span class="badge badge-warning">告警</span>',
+                                                                idle: '<span class="badge badge-secondary">空闲</span>',
+                                                                unknown: '<span class="badge badge-light">未知</span>'
+                                                            }
+                                                        }
+                                                    ],
+                                                    placeholder: '暂无组件数据'
+                                                }
+                                            }
+                                        ]
                                     }
                                 ]
                             }
@@ -73,44 +113,72 @@ class SystemMonitor {
                             body: {
                                 type: 'service',
                                 api: {
-                                    url: resolveMonitorBackendUrl('/api/admin/queue/stats'),
+                                    url: resolveMonitorBackendUrl('/api/admin/system/queue/stats'),
                                     method: 'get',
                                     adaptor: function(payload) {
+                                        const data = payload || {};
+                                        const queues = ['rssQueue', 'aiQueue', 'distributionQueue', 'storageQueue'];
+                                        const queueRows = queues.map(function(key) {
+                                            const info = data[key] || {};
+                                            const nameMap = {
+                                                rssQueue: 'RSS队列',
+                                                aiQueue: 'AI队列',
+                                                distributionQueue: '内容分发',
+                                                storageQueue: '存储优化'
+                                            };
+                                            return {
+                                                key,
+                                                name: nameMap[key] || key,
+                                                pending: info.pending || 0,
+                                                processing: info.processing || 0,
+                                                failed: info.failed || 0,
+                                                total: info.total || 0
+                                            };
+                                        });
+                                        const summary = data.summary || {};
                                         return {
                                             status: 0,
-                                            msg: '队列统计',
-                                            data: payload
+                                            data: {
+                                                summary,
+                                                queueRows
+                                            }
                                         };
                                     }
                                 },
                                 body: [
                                     {
-                                        type: 'tpl',
-                                        tpl: '队列统计',
-                                        wrapperComponent: 'h2'
-                                    },
-                                    {
-                                        type: 'cards',
-                                        cards: [
+                                        type: 'grid',
+                                        columns: [
                                             {
-                                                title: 'RSS处理队列',
-                                                body: {
-                                                    type: 'tpl',
-                                                    tpl: '待处理: ${data.rssQueue.pending}<br/>处理中: ${data.rssQueue.processing}<br/>失败: ${data.rssQueue.failed}'
-                                                }
+                                                md: 4,
+                                                body: [
+                                                    {
+                                                        type: 'tpl',
+                                                        tpl: '<div class="text-muted mb-1">待处理</div><div class="display-6">${summary.totalPending || 0}</div>'
+                                                    },
+                                                    {
+                                                        type: 'tpl',
+                                                        tpl: '<div class="text-muted mb-1">处理中</div><div class="display-6">${summary.totalProcessing || 0}</div>'
+                                                    },
+                                                    {
+                                                        type: 'tpl',
+                                                        tpl: '<div class="text-muted mb-1">失败</div><div class="display-6 text-danger">${summary.totalFailed || 0}</div>'
+                                                    }
+                                                ]
                                             },
                                             {
-                                                title: 'AI处理队列',
+                                                md: 8,
                                                 body: {
-                                                    type: 'tpl',
-                                                    tpl: '待处理: ${data.aiQueue.pending}<br/>处理中: ${data.aiQueue.processing}<br/>失败: ${data.aiQueue.failed}'
-                                                }
-                                            },
-                                            {
-                                                title: '内容分发队列',
-                                                body: {
-                                                    type: 'tpl',
-                                                    tpl: '待处理: ${data.distributionQueue.pending}<br/>处理中: ${data.distributionQueue.processing}<br/>失败: ${data.distributionQueue.failed}'
+                                                    type: 'table',
+                                                    source: '${queueRows}',
+                                                    columns: [
+                                                        { name: 'name', label: '队列' },
+                                                        { name: 'pending', label: '待处理' },
+                                                        { name: 'processing', label: '处理中' },
+                                                        { name: 'failed', label: '失败' },
+                                                        { name: 'total', label: '总数' }
+                                                    ],
+                                                    placeholder: '暂无队列数据'
                                                 }
                                             }
                                         ]
@@ -376,389 +444,12 @@ document.addEventListener('DOMContentLoaded', function() {
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = SystemMonitor;
 } else if (typeof window !== 'undefined') {
-    // 直接导出schema创建函数
     window.SystemMonitor = {
         createMonitorPage: function() {
-            // 返回系统监控页面的完整schema
-            return {
-                type: 'page',
-                title: '系统状态监控',
-                body: [
-                    {
-                        type: 'grid',
-                        columns: [
-                            {
-                                md: 6,
-                                body: {
-                                    type: 'service',
-                                    api: {
-                                        url: resolveMonitorBackendUrl('/api/admin/system/status'),
-                                        method: 'get',
-                                        adaptor: function(payload) {
-                                            return {
-                                                status: payload.status === 'healthy' ? 0 : 1,
-                                                msg: payload.status === 'healthy' ? '系统正常' : '系统异常',
-                                                data: payload
-                                            };
-                                        }
-                                    },
-                                    body: [
-                                        {
-                                            type: 'tpl',
-                                            tpl: '系统总览',
-                                            wrapperComponent: 'h2'
-                                        },
-                                        {
-                                            type: 'status',
-                                            name: 'status'
-                                        },
-                                        {
-                                            type: 'tpl',
-                                            tpl: '${msg}'
-                                        },
-                                        {
-                                            type: 'grid',
-                                            columns: [
-                                                {
-                                                    md: 6,
-                                                    body: {
-                                                        type: 'tpl',
-                                                        tpl: 'RSS源状态',
-                                                        wrapperComponent: 'h3'
-                                                    }
-                                                },
-                                                {
-                                                    md: 6,
-                                                    body: {
-                                                        type: 'tpl',
-                                                        tpl: '内容处理状态',
-                                                        wrapperComponent: 'h3'
-                                                    }
-                                                }
-                                            ]
-                                        },
-                                        {
-                                            type: 'grid',
-                                            columns: [
-                                                {
-                                                    md: 6,
-                                                    body: {
-                                                        type: 'tpl',
-                                                        tpl: '总数: ${data.data.components.rssSources.total}',
-                                                        visibleOn: 'data.data.components.rssSources'
-                                                    }
-                                                },
-                                                {
-                                                    md: 6,
-                                                    body: {
-                                                        type: 'tpl',
-                                                        tpl: '活跃: ${data.data.components.rssSources.active}',
-                                                        visibleOn: 'data.data.components.rssSources'
-                                                    }
-                                                }
-                                            ]
-                                        },
-                                        {
-                                            type: 'grid',
-                                            columns: [
-                                                {
-                                                    md: 6,
-                                                    body: {
-                                                        type: 'tpl',
-                                                        tpl: '已处理: ${data.data.components.contentProcessing.processed}',
-                                                        visibleOn: 'data.data.components.contentProcessing'
-                                                    }
-                                                },
-                                                {
-                                                    md: 6,
-                                                    body: {
-                                                        type: 'tpl',
-                                                        tpl: '成功率: ${data.data.components.contentProcessing.successRate}',
-                                                        visibleOn: 'data.data.components.contentProcessing'
-                                                    }
-                                                }
-                                            ]
-                                        }
-                                    ]
-                                }
-                            },
-                            {
-                                md: 6,
-                                body: {
-                                    type: 'service',
-                                    api: {
-                                        url: resolveMonitorBackendUrl('/api/admin/system/queue/stats'),
-                                        method: 'get'
-                                    },
-                                    body: [
-                                        {
-                                            type: 'tpl',
-                                            tpl: '队列统计',
-                                            wrapperComponent: 'h2'
-                                        },
-                                        {
-                                            type: 'grid',
-                                            columns: [
-                                                {
-                                                    md: 6,
-                                                    body: {
-                                                        type: 'tpl',
-                                                        tpl: 'RSS队列'
-                                                    }
-                                                },
-                                                {
-                                                    md: 6,
-                                                    body: {
-                                                        type: 'tpl',
-                                                        tpl: 'AI队列'
-                                                    }
-                                                }
-                                            ]
-                                        },
-                                        {
-                                            type: 'grid',
-                                            columns: [
-                                                {
-                                                    md: 6,
-                                                    body: {
-                                                        type: 'tpl',
-                                                        tpl: '待处理: ${data.rssQueue.pending}'
-                                                    }
-                                                },
-                                                {
-                                                    md: 6,
-                                                    body: {
-                                                        type: 'tpl',
-                                                        tpl: '待处理: ${data.aiQueue.pending}'
-                                                    }
-                                                }
-                                            ]
-                                        },
-                                        {
-                                            type: 'grid',
-                                            columns: [
-                                                {
-                                                    md: 6,
-                                                    body: {
-                                                        type: 'tpl',
-                                                        tpl: '处理中: ${data.rssQueue.processing}'
-                                                    }
-                                                },
-                                                {
-                                                    md: 6,
-                                                    body: {
-                                                        type: 'tpl',
-                                                        tpl: '处理中: ${data.aiQueue.processing}'
-                                                    }
-                                                }
-                                            ]
-                                        }
-                                    ]
-                                }
-                            }
-                        ]
-                    },
-                    {
-                        type: 'tpl',
-                        tpl: '队列详情',
-                        wrapperComponent: 'h2'
-                    },
-                    {
-                        type: 'tabs',
-                        tabs: [
-                            {
-                                title: 'RSS队列',
-                                body: {
-                                    type: 'service',
-                                    api: {
-                                        url: resolveMonitorBackendUrl('/api/admin/system/queue/rss/details'),
-                                        method: 'get'
-                                    },
-                                    body: [
-                                        {
-                                            type: 'table',
-                                            name: 'items',
-                                            columns: [
-                                                {
-                                                    name: 'id',
-                                                    label: 'ID',
-                                                    type: 'text'
-                                                },
-                                                {
-                                                    name: 'title',
-                                                    label: '标题',
-                                                    type: 'text'
-                                                },
-                                                {
-                                                    name: 'status',
-                                                    label: '状态',
-                                                    type: 'mapping',
-                                                    map: {
-                                                        'pending': 'warning',
-                                                        'processing': 'info',
-                                                        'completed': 'success',
-                                                        'failed': 'danger'
-                                                    }
-                                                },
-                                                {
-                                                    name: 'createdAt',
-                                                    label: '创建时间',
-                                                    type: 'datetime',
-                                                    format: 'YYYY-MM-DD HH:mm:ss'
-                                                }
-                                            ]
-                                        }
-                                    ]
-                                }
-                            },
-                            {
-                                title: 'AI队列',
-                                body: {
-                                    type: 'service',
-                                    api: {
-                                        url: resolveMonitorBackendUrl('/api/admin/system/queue/ai/details'),
-                                        method: 'get'
-                                    },
-                                    body: [
-                                        {
-                                            type: 'table',
-                                            name: 'items',
-                                            columns: [
-                                                {
-                                                    name: 'id',
-                                                    label: 'ID',
-                                                    type: 'text'
-                                                },
-                                                {
-                                                    name: 'title',
-                                                    label: '标题',
-                                                    type: 'text'
-                                                },
-                                                {
-                                                    name: 'status',
-                                                    label: '状态',
-                                                    type: 'mapping',
-                                                    map: {
-                                                        'pending': 'warning',
-                                                        'processing': 'info',
-                                                        'completed': 'success',
-                                                        'failed': 'danger'
-                                                    }
-                                                },
-                                                {
-                                                    name: 'createdAt',
-                                                    label: '创建时间',
-                                                    type: 'datetime',
-                                                    format: 'YYYY-MM-DD HH:mm:ss'
-                                                }
-                                            ]
-                                        }
-                                    ]
-                                }
-                            }
-                        ]
-                    },
-                    {
-                        type: 'tpl',
-                        tpl: '操作控制',
-                        wrapperComponent: 'h2'
-                    },
-                    {
-                        type: 'grid',
-                        columns: [
-                            {
-                                md: 3,
-                                body: {
-                                    type: 'action',
-                                    label: '手动触发RSS抓取',
-                                    level: 'primary',
-                                    actionType: 'ajax',
-                                    api: {
-                                        method: 'post',
-                                        url: resolveMonitorBackendUrl('/api/admin/system/rss/trigger-fetch')
-                                    },
-                                    confirmText: '确定要手动触发RSS抓取吗？'
-                                }
-                            },
-                            {
-                                md: 3,
-                                body: {
-                                    type: 'action',
-                                    label: '刷新队列状态',
-                                    level: 'info',
-                                    actionType: 'reload',
-                                    target: 'window'
-                                }
-                            },
-                            {
-                                md: 3,
-                                body: {
-                                    type: 'action',
-                                    label: '清理失败任务',
-                                    level: 'warning',
-                                    actionType: 'ajax',
-                                    api: {
-                                        method: 'post',
-                                        url: resolveMonitorBackendUrl('/api/admin/system/queue/cleanup')
-                                    },
-                                    confirmText: '确定要清理所有失败的任务吗？'
-                                }
-                            },
-                            {
-                                md: 3,
-                                body: {
-                                    type: 'action',
-                                    label: '系统日志',
-                                    level: 'default',
-                                    actionType: 'dialog',
-                                    dialog: {
-                                        title: '系统日志',
-                                        body: {
-                                            type: 'service',
-                                            api: {
-                                                url: resolveMonitorBackendUrl('/api/admin/system/logs'),
-                                                method: 'get'
-                                            },
-                                            body: [
-                                                {
-                                                    type: 'table',
-                                                    name: 'logs',
-                                                    columns: [
-                                                        {
-                                                            name: 'timestamp',
-                                                            label: '时间',
-                                                            type: 'datetime',
-                                                            format: 'YYYY-MM-DD HH:mm:ss'
-                                                        },
-                                                        {
-                                                            name: 'level',
-                                                            label: '级别',
-                                                            type: 'mapping',
-                                                            map: {
-                                                                'INFO': 'success',
-                                                                'WARN': 'warning',
-                                                                'ERROR': 'danger'
-                                                            }
-                                                        },
-                                                        {
-                                                            name: 'message',
-                                                            label: '消息'
-                                                        },
-                                                        {
-                                                            name: 'source',
-                                                            label: '来源'
-                                                        }
-                                                    ]
-                                                }
-                                            ]
-                                        }
-                                    }
-                                }
-                            }
-                        ]
-                    }
-                ]
-            };
+            if (!window.systemMonitor) {
+                window.systemMonitor = new SystemMonitor();
+            }
+            return window.systemMonitor.createMonitorPage();
         }
     };
 }
