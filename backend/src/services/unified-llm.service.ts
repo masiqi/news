@@ -27,7 +27,7 @@ export interface LLMProcessingParams {
   content: string;
   link?: string;
   isHtml?: boolean;
-  apiKey: string;
+  apiKey?: string;
   provider?: 'glm' | 'openrouter' | 'cloudflare' | 'auto';
   openRouterKey?: string;
   enableFallback?: boolean;
@@ -106,10 +106,14 @@ export class UnifiedLLMService {
       case 'openrouter':
         strategies.push({
           name: 'OpenRouter GLM',
-          execute: (params) => OpenRouterService.analyzeContent({
-            ...params,
-            apiKey: params.openRouterKey || ''
-          }, 'z-ai/glm-4.5-air:free')
+          execute: (params, env) => {
+            const openRouterKey = env?.OPENROUTER_API_KEY || params.openRouterKey;
+            if (!openRouterKey) throw new Error('OpenRouter API key required');
+            return OpenRouterService.analyzeContent({
+              ...params,
+              apiKey: openRouterKey
+            }, 'z-ai/glm-4.5-air:free');
+          }
         });
         break;
 
@@ -134,11 +138,12 @@ export class UnifiedLLMService {
         if (enableFallback) {
           strategies.push({
             name: 'OpenRouter GLM (备用)',
-            execute: (params) => {
-              if (!params.openRouterKey) throw new Error('OpenRouter API key required');
+            execute: (params, env) => {
+              const openRouterKey = env?.OPENROUTER_API_KEY;
+              if (!openRouterKey) throw new Error('OpenRouter API key required');
               return OpenRouterService.analyzeContent({
                 ...params,
-                apiKey: params.openRouterKey
+                apiKey: openRouterKey
               }, 'z-ai/glm-4.5-air:free');
             }
           });
@@ -166,6 +171,15 @@ export class UnifiedLLMService {
     env?: any
   ): Promise<LLMAnalysisResult> {
     console.log(`[EXECUTE] Starting ${strategy.name} analysis...`);
+    
+    // 调试：输出环境变量信息
+    if (strategy.name.includes('OpenRouter')) {
+      console.log(`[DEBUG] OpenRouter environment check:`);
+      console.log(`  - env.OPENROUTER_API_KEY: ${env?.OPENROUTER_API_KEY ? 'Set (' + env.OPENROUTER_API_KEY.substring(0, 8) + '...)' : 'Not set'}`);
+      console.log(`  - params.openRouterKey: ${params.openRouterKey ? 'Set (' + params.openRouterKey.substring(0, 8) + '...)' : 'Not set'}`);
+      console.log(`  - env object keys: ${env ? Object.keys(env).join(', ') : 'No env object'}`);
+    }
+    
     const result = await strategy.execute(params, env);
     console.log(`[COMPLETE] ${strategy.name} analysis successful`);
     return result;
