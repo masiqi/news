@@ -88,7 +88,8 @@ const server = http.createServer((req, res) => {
       });
       backendRes.on('end', () => {
         console.log(`后端响应状态码: ${backendRes.statusCode}`);
-        console.log(`后端响应数据: ${data}`);
+        // 只输出响应数据的长度，不输出完整内容
+        console.log(`后端响应数据长度: ${data.length} 字符`);
         res.writeHead(backendRes.statusCode || 200, { 'Content-Type': 'application/json' });
         res.end(data);
       });
