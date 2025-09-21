@@ -19,9 +19,7 @@ contentRoutes.get("/", async (c) => {
     const hasTopics = c.req.query('hasTopics');
     const searchQuery = c.req.query('searchQuery');
     
-    console.log('获取内容列表参数:', {
-      page, pageSize, sourceId, hasWebContent, hasTopics, searchQuery
-    });
+    console.log(`[CONTENT] 获取内容列表 - 页码: ${page}, 每页: ${pageSize}${sourceId ? `, 源ID: ${sourceId}` : ''}${searchQuery ? ', 搜索: ' + searchQuery : ''}`);
 
     // 计算分页偏移量
     const offset = (page - 1) * pageSize;
