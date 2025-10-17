@@ -150,7 +150,7 @@ export class UnifiedLLMService {
 
       case 'auto':
       default:
-        // 三级处理：Cerebras → 智谱 → OpenRouter (Cloudflare AI 已禁用)
+        // 三级处理：Cerebras → OpenRouter → 智谱 (Cloudflare AI 已禁用)
         strategies.push({
           name: 'Cerebras Qwen 3 235B',
           execute: (params, env) => {
@@ -168,11 +168,6 @@ export class UnifiedLLMService {
 
         if (enableFallback) {
           strategies.push({
-            name: 'GLM (智谱AI - 备用)',
-            execute: (params) => this.analyzeWithGLM(params)
-          });
-
-          strategies.push({
             name: 'OpenRouter GLM (备用)',
             execute: (params, env) => {
               const openRouterKey = env?.OPENROUTER_API_KEY;
@@ -182,6 +177,11 @@ export class UnifiedLLMService {
                 apiKey: openRouterKey
               }, 'z-ai/glm-4.5-air:free');
             }
+          });
+
+          strategies.push({
+            name: 'GLM (智谱AI - 备用)',
+            execute: (params) => this.analyzeWithGLM(params)
           });
 
           // Cloudflare AI 已禁用 - 成本过高
