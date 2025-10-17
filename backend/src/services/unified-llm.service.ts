@@ -137,18 +137,20 @@ export class UnifiedLLMService {
         break;
 
       case 'cloudflare':
-        strategies.push({
-          name: 'Cloudflare AI',
-          execute: (params, env) => {
-            if (!env) throw new Error('Cloudflare environment required');
-            return CloudflareLLMService.analyzeContent(params, env);
-          }
-        });
+        // Cloudflare AI 已禁用 - 成本过高
+        throw new Error('Cloudflare AI provider is disabled due to high cost. Please use cerebras, glm, or openrouter instead.');
+        // strategies.push({
+        //   name: 'Cloudflare AI',
+        //   execute: (params, env) => {
+        //     if (!env) throw new Error('Cloudflare environment required');
+        //     return CloudflareLLMService.analyzeContent(params, env);
+        //   }
+        // });
         break;
 
       case 'auto':
       default:
-        // 四级处理：Cerebras → 智谱 → OpenRouter → Cloudflare
+        // 三级处理：Cerebras → 智谱 → OpenRouter (Cloudflare AI 已禁用)
         strategies.push({
           name: 'Cerebras Qwen 3 235B',
           execute: (params, env) => {
@@ -182,13 +184,14 @@ export class UnifiedLLMService {
             }
           });
 
-          strategies.push({
-            name: 'Cloudflare AI (最终备用)',
-            execute: (params, env) => {
-              if (!env) throw new Error('Cloudflare environment required');
-              return CloudflareLLMService.analyzeContent(params, env);
-            }
-          });
+          // Cloudflare AI 已禁用 - 成本过高
+          // strategies.push({
+          //   name: 'Cloudflare AI (最终备用)',
+          //   execute: (params, env) => {
+          //     if (!env) throw new Error('Cloudflare environment required');
+          //     return CloudflareLLMService.analyzeContent(params, env);
+          //   }
+          // });
         }
         break;
     }
