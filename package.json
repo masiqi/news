@@ -14,7 +14,11 @@
     "build": "turbo build",
     "test": "turbo test",
     "lint": "turbo lint",
-    "clean": "turbo clean"
+    "clean": "turbo clean",
+    "deploy": "bash deploy-all.sh",
+    "deploy:backend": "cd backend && bash deploy.sh",
+    "deploy:admin": "cd admin && bash deploy.sh",
+    "deploy:frontend": "cd frontend && bash deploy.sh"
   },
   "devDependencies": {
     "turbo": "^2.5.6"

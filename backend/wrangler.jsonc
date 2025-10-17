@@ -1,5 +1,5 @@
 {
-  "name": "moxiang-distill",
+  "name": "moxiang-distill-api",
   "main": "src/index.ts",
   "compatibility_date": "2024-09-23",
   "compatibility_flags": ["nodejs_compat"],
@@ -13,11 +13,13 @@
     }
   ],
   "vars": {
-    "JWT_SECRET": "your_super_secure_jwt_secret_key_here",
+    "JWT_SECRET": "tuBlDZtZ4K7GsK0l+BZ4wvEKhJSHHWUIe4xs7nQI8ag=",
     "ADMIN_USERNAME": "admin",
-    "ADMIN_PASSWORD": "your_secure_admin_password",
-    "DEFAULT_LLM_PROVIDER": "auto",
+    "ADMIN_PASSWORD": "Admin@123456",
+    "DEFAULT_LLM_PROVIDER": "cerebras",
     "ENABLE_LLM_FALLBACK": "true",
+    "CEREBRAS_API_URL": "https://api.cerebras.ai/v1",
+    "CEREBRAS_DEFAULT_MODEL": "qwen-3-235b-a22b-instruct-2507",
     "NODE_ENV": "production"
   },
   "ai": {
@@ -27,26 +29,26 @@
     {
       "binding": "DB",
       "database_name": "news-db",
-      "database_id": "production"
+      "database_id": "75430083-6d50-425e-ab5e-eee556ba5c03"
     }
   ],
   "queues": {
     "producers": [
       {
         "binding": "RSS_FETCHER_QUEUE",
-        "queue": "RSS_FETCHER_QUEUE"
+        "queue": "rss-fetcher-queue"
       },
       {
         "binding": "AI_PROCESSOR_QUEUE",
-        "queue": "AI_PROCESSOR_QUEUE"
+        "queue": "ai-processor-queue"
       }
     ],
     "consumers": [
       {
-        "queue": "RSS_FETCHER_QUEUE"
+        "queue": "rss-fetcher-queue"
       },
       {
-        "queue": "AI_PROCESSOR_QUEUE"
+        "queue": "ai-processor-queue"
       }
     ]
   }

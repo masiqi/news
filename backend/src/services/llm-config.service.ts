@@ -1,7 +1,7 @@
 // src/services/llm-config.service.ts
 export interface LLMProvider {
   name: string;
-  provider: 'glm' | 'openrouter' | 'cloudflare';
+  provider: 'glm' | 'openrouter' | 'cloudflare' | 'cerebras';
   model: string;
   apiKey: string;
   enabled: boolean;
@@ -17,14 +17,29 @@ export class LLMConfigService {
   private static providers: Map<string, LLMProvider> = new Map();
 
   static initializeProviders() {
-    // GLM (智谱AI) - 主力配置
+    // Cerebras - 超快速推理，推荐默认
+    this.providers.set('cerebras', {
+      name: 'Qwen 3 235B (Cerebras)',
+      provider: 'cerebras',
+      model: 'qwen-3-235b-a22b-instruct-2507',
+      apiKey: process.env.CEREBRAS_API_KEY || '',
+      enabled: !!process.env.CEREBRAS_API_KEY,
+      priority: 1, // 最高优先级
+      maxConcurrency: 50,
+      dailyLimit: 10000,
+      costPer1kTokens: 0.0006,
+      strengths: ['超快速推理（业界最快）', '高并发支持', '性价比极高', '中文理解极佳（Qwen 3）', '长上下文支持（128K）'],
+      weaknesses: ['需要 API key 配置']
+    });
+
+    // GLM (智谱AI) - 中文优化备选
     this.providers.set('glm', {
       name: 'GLM-4.5-Flash (智谱AI)',
       provider: 'glm',
       model: 'glm-4.5-flash',
       apiKey: process.env.ZHIPUAI_API_KEY || '',
       enabled: !!process.env.ZHIPUAI_API_KEY,
-      priority: 1, // 第一优先级
+      priority: 2, // 第二优先级
       maxConcurrency: 5,
       dailyLimit: 1000,
       costPer1kTokens: 0.001,
@@ -39,7 +54,7 @@ export class LLMConfigService {
       model: 'z-ai/glm-4.5-air:free',
       apiKey: process.env.OPENROUTER_API_KEY || '',
       enabled: !!process.env.OPENROUTER_API_KEY,
-      priority: 2, // 第二优先级
+      priority: 3, // 第三优先级
       maxConcurrency: 20,
       dailyLimit: 1000,
       costPer1kTokens: 0, // 免费额度内
@@ -54,7 +69,7 @@ export class LLMConfigService {
       model: 'mistral/mixtral-8x22b-instruct-v0.1',
       apiKey: process.env.OPENROUTER_API_KEY || '',
       enabled: !!process.env.OPENROUTER_API_KEY,
-      priority: 3,
+      priority: 4,
       maxConcurrency: 20,
       dailyLimit: 1000,
       costPer1kTokens: 0.00065,
@@ -69,7 +84,7 @@ export class LLMConfigService {
       model: 'qwen/qwen-72b-chat',
       apiKey: process.env.OPENROUTER_API_KEY || '',
       enabled: !!process.env.OPENROUTER_API_KEY,
-      priority: 4,
+      priority: 5,
       maxConcurrency: 10,
       dailyLimit: 800,
       costPer1kTokens: 0.0009,
@@ -84,7 +99,7 @@ export class LLMConfigService {
       model: '@cf/meta/llama-3.1-8b-instruct',
       apiKey: '',
       enabled: false, // 需要环境变量支持
-      priority: 5,
+      priority: 6,
       maxConcurrency: 10,
       dailyLimit: 1000,
       costPer1kTokens: 0,

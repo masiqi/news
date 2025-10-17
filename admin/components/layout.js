@@ -67,6 +67,10 @@ function createSidebarLayout(activePage) {
  * 创建CRUD页面的基础配置
  */
 function createCrudPageConfig(title, apiConfig, columnsConfig, actionsConfig = {}) {
+    // 确保使用后端 API 地址
+    const statisticsUrl = window.buildAdminBackendUrl ? window.buildAdminBackendUrl(apiConfig.statisticsApi || '') : apiConfig.statisticsApi;
+    const listUrl = window.buildAdminBackendUrl ? window.buildAdminBackendUrl(apiConfig.listApi) : apiConfig.listApi;
+
     return {
         type: 'page',
         title: title,
@@ -74,7 +78,7 @@ function createCrudPageConfig(title, apiConfig, columnsConfig, actionsConfig = {
             type: 'service',
             api: {
                 method: 'get',
-                url: apiConfig.statisticsApi || '',
+                url: statisticsUrl,
                 headers: {
                     'Authorization': 'Bearer ' + localStorage.getItem('admin_token')
                 }
@@ -136,7 +140,7 @@ function createCrudPageConfig(title, apiConfig, columnsConfig, actionsConfig = {
                     type: 'crud',
                     api: {
                         method: 'get',
-                        url: apiConfig.listApi,
+                        url: listUrl,
                         headers: {
                             'Authorization': 'Bearer ' + localStorage.getItem('admin_token')
                         },

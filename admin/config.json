@@ -1,12 +1,4 @@
 {
-  "development": {
-    "backendHost": "localhost",
-    "backendPort": 34335,
-    "adminPort": 8101
-  },
-  "production": {
-    "backendHost": "10.1.0.241",
-    "backendPort": 8787,
-    "adminPort": 8000
-  }
+  "apiUrl": "https://moxiang-distill-api.masiqi.workers.dev",
+  "adminTitle": "墨香蒸馏 - 管理后台"
 }

@@ -4,6 +4,7 @@ import { rssEntries, processedContents } from '../db/schema';
 import { eq } from 'drizzle-orm';
 import { CloudflareLLMService } from './cloudflare-llm.service';
 import { OpenRouterService } from './openrouter.service';
+import { CerebrasService } from './cerebras.service';
 
 export interface LLMAnalysisResult {
   topics: string[];
@@ -28,8 +29,9 @@ export interface LLMProcessingParams {
   link?: string;
   isHtml?: boolean;
   apiKey?: string;
-  provider?: 'glm' | 'openrouter' | 'cloudflare' | 'auto';
+  provider?: 'glm' | 'openrouter' | 'cloudflare' | 'cerebras' | 'auto';
   openRouterKey?: string;
+  cerebrasKey?: string;
   enableFallback?: boolean;
 }
 
@@ -96,6 +98,23 @@ export class UnifiedLLMService {
 
     // 根据provider策略决定执行顺序
     switch (provider) {
+      case 'cerebras':
+        strategies.push({
+          name: 'Cerebras Qwen 3 235B',
+          execute: (params, env) => {
+            const cerebrasKey = env?.CEREBRAS_API_KEY || params.cerebrasKey;
+            if (!cerebrasKey) throw new Error('Cerebras API key required');
+            return CerebrasService.analyzeContent({
+              title: params.title,
+              content: params.content,
+              link: params.link,
+              isHtml: params.isHtml,
+              apiKey: cerebrasKey
+            }, env);
+          }
+        });
+        break;
+
       case 'glm':
         strategies.push({
           name: 'GLM (智谱AI)',
@@ -129,13 +148,28 @@ export class UnifiedLLMService {
 
       case 'auto':
       default:
-        // 三级处理：智谱 → OpenRouter → Cloudflare
+        // 四级处理：Cerebras → 智谱 → OpenRouter → Cloudflare
         strategies.push({
-          name: 'GLM (智谱AI)',
-          execute: (params) => this.analyzeWithGLM(params)
+          name: 'Cerebras Qwen 3 235B',
+          execute: (params, env) => {
+            const cerebrasKey = env?.CEREBRAS_API_KEY;
+            if (!cerebrasKey) throw new Error('Cerebras API key required');
+            return CerebrasService.analyzeContent({
+              title: params.title,
+              content: params.content,
+              link: params.link,
+              isHtml: params.isHtml,
+              apiKey: cerebrasKey
+            }, env);
+          }
         });
 
         if (enableFallback) {
+          strategies.push({
+            name: 'GLM (智谱AI - 备用)',
+            execute: (params) => this.analyzeWithGLM(params)
+          });
+
           strategies.push({
             name: 'OpenRouter GLM (备用)',
             execute: (params, env) => {
@@ -149,7 +183,7 @@ export class UnifiedLLMService {
           });
 
           strategies.push({
-            name: 'Cloudflare AI (备用)',
+            name: 'Cloudflare AI (最终备用)',
             execute: (params, env) => {
               if (!env) throw new Error('Cloudflare environment required');
               return CloudflareLLMService.analyzeContent(params, env);

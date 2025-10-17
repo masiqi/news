@@ -51,14 +51,22 @@
     <!-- 引入模块化组件 -->
     <script>
         // 初始化后端请求工具，支持自定义后端地址
-        (function initializeBackendUrlHelpers() {
+        (async function initializeBackendUrlHelpers() {
             if (typeof window === 'undefined') {
                 return;
             }
-            const defaultBackendBase = window.location ? window.location.origin : '';
-            if (!window.ADMIN_BACKEND_BASE_URL) {
-                window.ADMIN_BACKEND_BASE_URL = defaultBackendBase;
+
+            // 从 config.json 加载配置
+            try {
+                const response = await fetch('/config.json');
+                const config = await response.json();
+                window.ADMIN_BACKEND_BASE_URL = config.apiUrl || '';
+                console.log('[Config] 后端 API 地址:', window.ADMIN_BACKEND_BASE_URL);
+            } catch (error) {
+                console.error('[Config] 加载配置失败，使用默认值:', error);
+                window.ADMIN_BACKEND_BASE_URL = window.location ? window.location.origin : '';
             }
+
             window.buildAdminBackendUrl = function(path = '') {
                 if (!path) {
                     return window.ADMIN_BACKEND_BASE_URL || '';
@@ -72,14 +80,27 @@
             };
         })();
 
-        // 确保 AMIS 库加载完成后再加载其他组件
-        function loadComponents() {
+        // 确保 AMIS 库和配置加载完成后再加载其他组件
+        async function loadComponents() {
             if (typeof amis !== 'undefined') {
+                // 等待后端 URL 配置加载完成
+                let retries = 0;
+                while (!window.ADMIN_BACKEND_BASE_URL && retries < 50) {
+                    await new Promise(resolve => setTimeout(resolve, 100));
+                    retries++;
+                }
+
+                if (!window.ADMIN_BACKEND_BASE_URL) {
+                    console.error('[Config] 配置加载超时，使用默认值');
+                } else {
+                    console.log('[Config] 配置加载成功:', window.ADMIN_BACKEND_BASE_URL);
+                }
+
                 // AMIS 已加载，加载组件
                 const componentFiles = [
                     '/components/layout.js',
                     '/components/navigation.js',
-                    '/components/login.js', 
+                    '/components/login.js',
                     '/components/dashboard.js',
                     '/components/user-management.js',
                     '/components/rss-management.js',
@@ -88,9 +109,9 @@
                     '/components/tags-management.js',
                     '/components/system-monitor.js'
                 ];
-                
+
                 let loadedCount = 0;
-                
+
                 function checkAllLoaded() {
                     loadedCount++;
                     if (loadedCount === componentFiles.length) {
@@ -98,7 +119,7 @@
                         initApp();
                     }
                 }
-                
+
                 const version = Date.now();
                 componentFiles.forEach(file => {
                     const script = document.createElement('script');

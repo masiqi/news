@@ -2,232 +2,292 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import NavigationMenu from '@/components/NavigationMenu';
-import RssSourceStatus from './components/RssSourceStatus';
+import { api } from '@/lib/api';
+import { formatDate } from '@/lib/utils';
 
-// 解析JWT令牌的函数
-const parseJwt = (token: string) => {
-  try {
-    console.log('开始解析JWT令牌');
-    // 检查令牌是否存在且格式正确
-    if (!token || typeof token !== 'string') {
-      console.error('令牌无效: 令牌不存在或不是字符串');
-      return null;
-    }
-    
-    const parts = token.split('.');
-    console.log('令牌部分:', parts);
-    console.log('部分数量:', parts.length);
-    
-    if (parts.length !== 3) {
-      console.error('令牌无效: JWT令牌应该有3个部分，实际有', parts.length);
-      return null;
-    }
-    
-    const base64Url = parts[1];
-    console.log('载荷部分:', base64Url);
-    
-    if (!base64Url) {
-      console.error('令牌无效: 无法获取载荷部分');
-      return null;
-    }
-    
-    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-    console.log('Base64编码:', base64);
-    
-    const jsonPayload = decodeURIComponent(
-      atob(base64)
-        .split('')
-        .map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
-        .join('')
-    );
-    console.log('解析后的载荷:', jsonPayload);
-    
-    const parsed = JSON.parse(jsonPayload);
-    console.log('解析后的对象:', parsed);
-    return parsed;
-  } catch (error) {
-    console.error('解析JWT令牌失败:', error);
-    return null;
-  }
-};
+interface Source {
+  id: number;
+  url: string;
+  title: string;
+  description: string | null;
+  isActive: boolean;
+  fetchInterval: number;
+  lastFetchAt: string | null;
+}
 
-// 验证JWT令牌是否过期
-const isTokenExpired = (token: string) => {
-  try {
-    console.log('开始检查令牌是否过期');
-    // 首先检查令牌格式
-    if (!token || typeof token !== 'string') {
-      console.error('令牌无效: 令牌不存在或不是字符串');
-      return true;
-    }
-    
-    const parsed = parseJwt(token);
-    console.log('解析结果:', parsed);
-    
-    if (!parsed) {
-      console.error('令牌无效: 无法解析令牌');
-      return true;
-    }
-    
-    if (!parsed.exp) {
-      console.error('令牌无效: 令牌中没有过期时间');
-      return true;
-    }
-    
-    const currentTime = Math.floor(Date.now() / 1000);
-    const isExpired = currentTime > parsed.exp;
-    console.log('当前时间:', currentTime, '过期时间:', parsed.exp, '是否过期:', isExpired);
-    return isExpired;
-  } catch (error) {
-    console.error('验证令牌过期时间失败:', error);
-    return true;
-  }
-};
+interface ContentItem {
+  id: number;
+  title: string;
+  url: string;
+  publishedAt: string;
+  summary: string | null;
+  tags: string[];
+}
 
 export default function DashboardPage() {
-  const [user, setUser] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
   const router = useRouter();
-
-  console.log('仪表板页面组件渲染, loading:', loading, 'user:', user);
+  const [activeTab, setActiveTab] = useState<'sources' | 'content'>('content');
+  const [sources, setSources] = useState<Source[]>([]);
+  const [content, setContent] = useState<ContentItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [showAddSource, setShowAddSource] = useState(false);
+  const [newSourceUrl, setNewSourceUrl] = useState('');
 
   useEffect(() => {
-    console.log('仪表板页面加载开始');
-    // 检查用户是否已登录
-    const checkLoginStatus = async () => {
-      try {
-        console.log('开始检查登录状态');
-        // 检查JWT令牌有效性
-        const allCookies = document.cookie;
-        console.log('所有cookies:', allCookies);
-        
-        const token = document.cookie
-          .split('; ')
-          .find(row => row.startsWith('token='))
-          ?.split('=')[1];
+    const token = localStorage.getItem('auth_token');
+    if (!token) {
+      router.push('/login');
+      return;
+    }
 
-        console.log('检查令牌:', token);
+    loadData();
+  }, [activeTab, router]);
 
-        if (!token) {
-          // 没有令牌，跳转到登录页面
-          console.log('没有找到令牌，跳转到登录页面');
-          router.push('/login');
-          return;
+  const loadData = async () => {
+    setLoading(true);
+    setError('');
+
+    try {
+      if (activeTab === 'sources') {
+        const response = await api.getSources();
+        if (response.success) {
+          setSources(response.data || []);
         }
-
-        // 检查令牌是否过期
-        console.log('开始检查令牌是否过期');
-        if (isTokenExpired(token)) {
-          console.log('令牌已过期，清除令牌并跳转到登录页面');
-          // 清除过期的令牌
-          document.cookie = 'token=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/';
-          router.push('/login');
-          return;
+      } else {
+        const response = await api.getContent();
+        if (response.success) {
+          setContent(response.data || []);
         }
-
-        // 解析JWT令牌获取用户信息
-        console.log('开始解析用户数据');
-        const userData = parseJwt(token);
-        console.log('解析用户数据结果:', userData);
-        
-        if (userData && userData.email) {
-          console.log('设置用户数据:', { email: userData.email, id: userData.id });
-          setUser({ email: userData.email, id: userData.id });
-        } else {
-          // 令牌无效，跳转到登录页面
-          console.log('令牌无效，跳转到登录页面');
-          router.push('/login');
-        }
-      } catch (error) {
-        console.error('检查登录状态失败:', error);
-        router.push('/login');
-      } finally {
-        console.log('设置loading为false');
-        setLoading(false);
       }
-    };
+    } catch (err) {
+      setError('加载数据失败');
+      console.error('Load data error:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    checkLoginStatus();
-  }, []);
+  const handleLogout = () => {
+    localStorage.removeItem('auth_token');
+    router.push('/');
+  };
 
-  if (loading) {
-    console.log('显示加载状态');
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-xl">加载中...</div>
-      </div>
-    );
-  }
+  const handleAddSource = async () => {
+    if (!newSourceUrl.trim()) return;
 
-  console.log('显示仪表板内容');
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'https://moxiang-distill.masiqi.workers.dev'}/api/sources`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+        },
+        body: JSON.stringify({ url: newSourceUrl })
+      });
+
+      if (response.ok) {
+        setNewSourceUrl('');
+        setShowAddSource(false);
+        loadData();
+      } else {
+        setError('添加 RSS 源失败');
+      }
+    } catch (err) {
+      setError('添加 RSS 源失败');
+      console.error('Add source error:', err);
+    }
+  };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* 导航栏 */}
-      <NavigationMenu />
-      
-      {/* 主要内容 */}
-      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-        <div className="px-4 py-6 sm:px-0">
-          <div className="border-4 border-dashed border-gray-200 rounded-lg h-96 p-4">
-            <h2 className="text-xl font-semibold mb-4 text-gray-900">欢迎来到您的仪表板</h2>
-            <p className="text-gray-800">您已成功登录系统。</p>
-            {user && <p className="text-gray-800">当前用户: {user.email}</p>}
-            
-            {/* RSS源状态组件 */}
-            <div className="mt-8">
-              <RssSourceStatus />
+    <div style={{ minHeight: '100vh' }}>
+      <header className="header">
+        <div className="container">
+          <nav className="nav">
+            <div className="logo">墨香蒸馏</div>
+            <div className="nav-links">
+              <a href="/dashboard">仪表板</a>
+              <button onClick={handleLogout} className="btn btn-secondary" style={{ padding: '8px 16px' }}>
+                退出登录
+              </button>
             </div>
-            
-            <div className="mt-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <div className="bg-white rounded-lg shadow p-6">
-                <h3 className="text-lg font-medium text-gray-900 mb-2">我的RSS源</h3>
-                <p className="text-gray-700 mb-4">管理您的个人RSS源</p>
-                <button
-                  onClick={() => router.push('/sources/my')}
-                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                >
-                  查看我的源
-                </button>
-              </div>
-              
-              <div className="bg-white rounded-lg shadow p-6">
-                <h3 className="text-lg font-medium text-gray-900 mb-2">公共RSS源</h3>
-                <p className="text-gray-700 mb-4">浏览和复制公共源</p>
-                <button
-                  onClick={() => router.push('/sources/public')}
-                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                >
-                  浏览公共源
-                </button>
-              </div>
+          </nav>
+        </div>
+      </header>
 
-              <div className="bg-white rounded-lg shadow p-6">
-                <h3 className="text-lg font-medium text-gray-900 mb-2">Markdown文件</h3>
-                <p className="text-gray-700 mb-4">查看AI生成的笔记文件</p>
-                <button
-                  onClick={() => router.push('/markdown')}
-                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
-                >
-                  查看文件
-                </button>
-              </div>
-              
-              <div className="bg-white rounded-lg shadow p-6">
-                <h3 className="text-lg font-medium text-gray-900 mb-2">设置</h3>
-                <p className="text-gray-700 mb-4">管理您的账户设置</p>
-                <button
-                  onClick={() => router.push('/settings')}
-                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                >
-                  账户设置
-                </button>
-              </div>
-            </div>
+      <div className="container" style={{ paddingTop: '32px' }}>
+        <div style={{ marginBottom: '24px', borderBottom: '2px solid #eee' }}>
+          <div style={{ display: 'flex', gap: '32px' }}>
+            <button
+              onClick={() => setActiveTab('content')}
+              style={{
+                padding: '12px 0',
+                border: 'none',
+                background: 'none',
+                fontSize: '16px',
+                fontWeight: '500',
+                cursor: 'pointer',
+                borderBottom: activeTab === 'content' ? '2px solid #0070f3' : '2px solid transparent',
+                color: activeTab === 'content' ? '#0070f3' : '#666',
+                marginBottom: '-2px'
+              }}
+            >
+              内容
+            </button>
+            <button
+              onClick={() => setActiveTab('sources')}
+              style={{
+                padding: '12px 0',
+                border: 'none',
+                background: 'none',
+                fontSize: '16px',
+                fontWeight: '500',
+                cursor: 'pointer',
+                borderBottom: activeTab === 'sources' ? '2px solid #0070f3' : '2px solid transparent',
+                color: activeTab === 'sources' ? '#0070f3' : '#666',
+                marginBottom: '-2px'
+              }}
+            >
+              RSS 源
+            </button>
           </div>
         </div>
-      </main>
+
+        {error && (
+          <div style={{
+            padding: '12px 16px',
+            background: '#fee',
+            color: '#c33',
+            borderRadius: '6px',
+            marginBottom: '20px',
+            fontSize: '14px'
+          }}>
+            {error}
+          </div>
+        )}
+
+        {activeTab === 'sources' && (
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <h2 style={{ fontSize: '24px', fontWeight: '700' }}>我的 RSS 源</h2>
+              <button
+                onClick={() => setShowAddSource(!showAddSource)}
+                className="btn btn-primary"
+              >
+                {showAddSource ? '取消' : '添加 RSS 源'}
+              </button>
+            </div>
+
+            {showAddSource && (
+              <div className="card" style={{ marginBottom: '20px' }}>
+                <h3 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '16px' }}>添加新的 RSS 源</h3>
+                <input
+                  type="url"
+                  className="input"
+                  value={newSourceUrl}
+                  onChange={(e) => setNewSourceUrl(e.target.value)}
+                  placeholder="https://example.com/rss"
+                  style={{ marginBottom: '12px' }}
+                />
+                <button onClick={handleAddSource} className="btn btn-primary">
+                  确认添加
+                </button>
+              </div>
+            )}
+
+            {loading ? (
+              <div className="card">加载中...</div>
+            ) : sources.length === 0 ? (
+              <div className="card">
+                <p style={{ color: '#666', textAlign: 'center' }}>还没有添加 RSS 源，点击上方按钮添加第一个吧！</p>
+              </div>
+            ) : (
+              sources.map((source) => (
+                <div key={source.id} className="card">
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start' }}>
+                    <div style={{ flex: 1 }}>
+                      <h3 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '8px' }}>
+                        {source.title}
+                      </h3>
+                      {source.description && (
+                        <p style={{ color: '#666', fontSize: '14px', marginBottom: '8px' }}>
+                          {source.description}
+                        </p>
+                      )}
+                      <p style={{ fontSize: '12px', color: '#999' }}>
+                        {source.url}
+                      </p>
+                      {source.lastFetchAt && (
+                        <p style={{ fontSize: '12px', color: '#999', marginTop: '8px' }}>
+                          最后抓取: {formatDate(source.lastFetchAt)}
+                        </p>
+                      )}
+                    </div>
+                    <span style={{
+                      padding: '4px 12px',
+                      borderRadius: '12px',
+                      fontSize: '12px',
+                      fontWeight: '500',
+                      background: source.isActive ? '#e8f5e9' : '#f5f5f5',
+                      color: source.isActive ? '#2e7d32' : '#666'
+                    }}>
+                      {source.isActive ? '活跃' : '已暂停'}
+                    </span>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        )}
+
+        {activeTab === 'content' && (
+          <div>
+            <h2 style={{ fontSize: '24px', fontWeight: '700', marginBottom: '20px' }}>最新内容</h2>
+
+            {loading ? (
+              <div className="card">加载中...</div>
+            ) : content.length === 0 ? (
+              <div className="card">
+                <p style={{ color: '#666', textAlign: 'center' }}>还没有内容，添加 RSS 源后系统会自动抓取内容。</p>
+              </div>
+            ) : (
+              content.map((item) => (
+                <div key={item.id} className="card">
+                  <h3 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '8px' }}>
+                    <a href={item.url} target="_blank" rel="noopener noreferrer">
+                      {item.title}
+                    </a>
+                  </h3>
+                  {item.summary && (
+                    <p style={{ color: '#666', fontSize: '14px', marginBottom: '12px', lineHeight: '1.6' }}>
+                      {item.summary}
+                    </p>
+                  )}
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '8px' }}>
+                    {item.tags && item.tags.map((tag, idx) => (
+                      <span
+                        key={idx}
+                        style={{
+                          padding: '2px 8px',
+                          background: '#f0f0f0',
+                          borderRadius: '4px',
+                          fontSize: '12px',
+                          color: '#666'
+                        }}
+                      >
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                  <p style={{ fontSize: '12px', color: '#999' }}>
+                    发布于: {formatDate(item.publishedAt)}
+                  </p>
+                </div>
+              ))
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

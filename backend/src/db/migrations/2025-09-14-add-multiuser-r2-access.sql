@@ -2,16 +2,17 @@
 -- 为Story 2.5添加访问控制相关表和字段
 
 -- 1. 扩展现有的sync_credentials表，添加访问控制字段
-ALTER TABLE sync_credentials ADD COLUMN IF NOT EXISTS path_prefix TEXT NOT NULL DEFAULT '';
-ALTER TABLE sync_credentials ADD COLUMN IF NOT EXISTS permissions_json TEXT; -- JSON格式存储详细权限
-ALTER TABLE sync_credentials ADD COLUMN IF NOT EXISTS max_storage_bytes INTEGER DEFAULT 104857600; -- 100MB
-ALTER TABLE sync_credentials ADD COLUMN IF NOT EXISTS current_storage_bytes INTEGER DEFAULT 0;
-ALTER TABLE sync_credentials ADD COLUMN IF NOT EXISTS max_file_count INTEGER DEFAULT 1000;
-ALTER TABLE sync_credentials ADD COLUMN IF NOT EXISTS current_file_count INTEGER DEFAULT 0;
-ALTER TABLE sync_credentials ADD COLUMN IF NOT EXISTS is_readonly INTEGER DEFAULT 1; -- 1为只读，0为读写
-ALTER TABLE sync_credentials ADD COLUMN IF NOT EXISTS token_hash TEXT; -- 用于访问控制的Token哈希
-ALTER TABLE sync_credentials ADD COLUMN IF NOT EXISTS last_accessed_at TIMESTAMP;
-ALTER TABLE sync_credentials ADD COLUMN IF NOT EXISTS access_count INTEGER DEFAULT 0;
+-- 注意：如果这些字段已存在，迁移会失败，这是正常的（说明已应用过）
+ALTER TABLE sync_credentials ADD COLUMN path_prefix TEXT NOT NULL DEFAULT '';
+ALTER TABLE sync_credentials ADD COLUMN permissions_json TEXT;
+ALTER TABLE sync_credentials ADD COLUMN max_storage_bytes INTEGER DEFAULT 104857600;
+ALTER TABLE sync_credentials ADD COLUMN current_storage_bytes INTEGER DEFAULT 0;
+ALTER TABLE sync_credentials ADD COLUMN max_file_count INTEGER DEFAULT 1000;
+ALTER TABLE sync_credentials ADD COLUMN current_file_count INTEGER DEFAULT 0;
+ALTER TABLE sync_credentials ADD COLUMN is_readonly INTEGER DEFAULT 1;
+ALTER TABLE sync_credentials ADD COLUMN token_hash TEXT;
+ALTER TABLE sync_credentials ADD COLUMN last_accessed_at TIMESTAMP;
+ALTER TABLE sync_credentials ADD COLUMN access_count INTEGER DEFAULT 0;
 
 -- 2. 创建用户R2访问配置表（更详细的访问控制）
 CREATE TABLE IF NOT EXISTS user_r2_access (

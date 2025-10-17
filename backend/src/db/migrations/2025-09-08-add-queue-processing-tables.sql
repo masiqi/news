@@ -56,8 +56,3 @@ CREATE INDEX idx_message_histories_created_at ON message_histories(created_at);
 CREATE INDEX idx_queue_stats_queue_name ON queue_stats(queue_name);
 CREATE INDEX idx_queue_stats_last_updated ON queue_stats(last_updated);
 CREATE INDEX idx_queue_stats_created_at ON queue_stats(created_at);
-
--- 添加注释
-COMMENT ON TABLE processing_statuses IS '队列处理状态跟踪表';
-COMMENT ON TABLE message_histories IS '队列消息历史记录表';
-COMMENT ON TABLE queue_stats IS '队列统计信息表';
