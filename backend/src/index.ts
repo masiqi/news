@@ -121,6 +121,27 @@ app.get("/message", (c) => {
   return c.text("Hello Hono!");
 });
 
+// ==================== 全局错误处理 ====================
+// 404 处理器 - 必须放在所有路由之后
+app.notFound((c) => {
+  return c.json({
+    success: false,
+    error: "接口不存在",
+    path: c.req.path,
+    method: c.req.method
+  }, 404);
+});
+
+// 全局错误处理器
+app.onError((err, c) => {
+  console.error('全局错误:', err);
+  return c.json({
+    success: false,
+    error: err.message || "服务器内部错误",
+    ...(process.env.NODE_ENV !== 'production' && { stack: err.stack })
+  }, 500);
+});
+
 // 队列处理函数
 async function queue(batch: MessageBatch<any>, env: CloudflareBindings): Promise<void> {
   console.log(`处理队列消息批次，包含 ${batch.messages.length} 条消息`);

@@ -52,7 +52,8 @@ export default function DashboardPage() {
       if (activeTab === 'sources') {
         const response = await api.getSources();
         if (response.success) {
-          setSources(response.data || []);
+          // 新的响应格式：{ success: true, data: { sources: [...], total: n } }
+          setSources(response.data?.sources || response.data || []);
         }
       } else {
         const response = await api.getContent();

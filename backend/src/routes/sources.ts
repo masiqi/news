@@ -18,32 +18,67 @@ sourceRoutes.use('*', async (c, next) => {
   await next();
 });
 
+// 获取当前用户的所有RSS源（根路径，需要认证）
+sourceRoutes.get("/", requireAuth, async (c) => {
+  try {
+    const user = getAuthUser(c);
+    if (!user) {
+      return c.json({ success: false, error: "用户未认证" }, 401);
+    }
+
+    const sourceService = c.get('sourceService') as SourceService;
+    const userSources = await sourceService.getUserSources(user.id);
+    return c.json({
+      success: true,
+      data: {
+        sources: userSources,
+        total: userSources.length
+      }
+    }, 200);
+  } catch (error) {
+    console.error("获取用户RSS源错误:", error);
+    return c.json({ success: false, error: "服务器内部错误" }, 500);
+  }
+});
+
 // 获取所有公共RSS源
 sourceRoutes.get("/public", async (c) => {
   try {
     const sourceService = c.get('sourceService') as SourceService;
     const publicSources = await sourceService.getPublicSources();
-    return c.json({ sources: publicSources }, 200);
+    return c.json({
+      success: true,
+      data: {
+        sources: publicSources,
+        total: publicSources.length
+      }
+    }, 200);
   } catch (error) {
     console.error("获取公共RSS源错误:", error);
-    return c.json({ error: "服务器内部错误" }, 500);
+    return c.json({ success: false, error: "服务器内部错误" }, 500);
   }
 });
 
-// 获取当前用户的所有RSS源
+// 获取当前用户的所有RSS源（别名路径，兼容旧代码）
 sourceRoutes.get("/my", requireAuth, async (c) => {
   try {
     const user = getAuthUser(c);
     if (!user) {
-      return c.json({ error: "用户未认证" }, 401);
+      return c.json({ success: false, error: "用户未认证" }, 401);
     }
 
     const sourceService = c.get('sourceService') as SourceService;
     const userSources = await sourceService.getUserSources(user.id);
-    return c.json({ sources: userSources }, 200);
+    return c.json({
+      success: true,
+      data: {
+        sources: userSources,
+        total: userSources.length
+      }
+    }, 200);
   } catch (error) {
     console.error("获取用户RSS源错误:", error);
-    return c.json({ error: "服务器内部错误" }, 500);
+    return c.json({ success: false, error: "服务器内部错误" }, 500);
   }
 });
 
