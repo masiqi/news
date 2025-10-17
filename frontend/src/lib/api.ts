@@ -2,25 +2,32 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'https://moxiang-distill-api
 
 export async function apiCall(endpoint: string, options: RequestInit = {}) {
   const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
-  
+
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     ...((options.headers as Record<string, string>) || {}),
   };
-  
+
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
   }
-  
+
   const response = await fetch(`${API_BASE}${endpoint}`, {
     ...options,
     headers,
   });
-  
+
   if (!response.ok) {
-    throw new Error(`API错误: ${response.statusText}`);
+    // 尝试解析后端返回的错误信息
+    try {
+      const errorData = await response.json();
+      throw new Error(errorData.error || errorData.message || `API错误: ${response.statusText}`);
+    } catch (parseError) {
+      // 如果无法解析JSON，使用HTTP状态文本
+      throw new Error(`API错误: ${response.statusText}`);
+    }
   }
-  
+
   return response.json();
 }
 

@@ -17,13 +17,21 @@ export default function RegisterPage() {
     e.preventDefault();
     setError('');
 
-    if (password !== confirmPassword) {
-      setError('两次输入的密码不一致');
+    // 验证密码长度
+    if (password.length < 8) {
+      setError('密码至少需要8位字符');
       return;
     }
 
-    if (password.length < 6) {
-      setError('密码长度至少为6位');
+    // 验证密码强度
+    if (!/(?=.*[a-zA-Z])(?=.*\d)/.test(password)) {
+      setError('密码必须包含字母和数字');
+      return;
+    }
+
+    // 验证两次密码是否一致
+    if (password !== confirmPassword) {
+      setError('两次输入的密码不一致');
       return;
     }
 
@@ -38,8 +46,10 @@ export default function RegisterPage() {
       } else {
         setError(response.message || '注册失败');
       }
-    } catch (err) {
-      setError('注册失败，请稍后重试');
+    } catch (err: any) {
+      // 显示后端返回的具体错误信息
+      const errorMessage = err?.message || '注册失败，请检查网络连接';
+      setError(errorMessage);
       console.error('Register error:', err);
     } finally {
       setLoading(false);
@@ -107,9 +117,12 @@ export default function RegisterPage() {
               className="input"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="至少6位"
+              placeholder="至少8位，包含字母和数字"
               required
             />
+            <p style={{ fontSize: '12px', color: '#999', marginTop: '4px' }}>
+              密码至少8位，必须包含字母和数字
+            </p>
           </div>
 
           <div style={{ marginBottom: '24px' }}>
