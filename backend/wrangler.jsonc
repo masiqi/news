@@ -51,5 +51,8 @@
         "queue": "ai-processor-queue"
       }
     ]
+  },
+  "triggers": {
+    "crons": ["0 * * * *"]
   }
 }

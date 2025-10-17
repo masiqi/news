@@ -45,5 +45,11 @@ export const api = {
   getPublicSources: () => apiCall('/api/v1/sources/public'),
 
   // 内容
-  getContent: () => apiCall('/api/v1/content'),
+  getContent: (params?: { page?: number; pageSize?: number }) => {
+    const queryParams = new URLSearchParams();
+    if (params?.page) queryParams.set('page', params.page.toString());
+    if (params?.pageSize) queryParams.set('pageSize', params.pageSize.toString());
+    const query = queryParams.toString();
+    return apiCall(`/api/v1/content${query ? `?${query}` : ''}`);
+  },
 };

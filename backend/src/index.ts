@@ -17,6 +17,7 @@ import adminRoutes from "./routes/admin";
 import adminMarkdownRoutes from "./routes/admin-markdown-simple";
 import reprocessRoutes from "./routes/reprocess";
 import tagsRoutes from "./routes/tags";
+import adminTagsRoutes from "./routes/admin/tags";
 import userAccessRoutes from "./routes/user-access";
 import adminAccessRoutes from "./routes/admin-access";
 import autoStorageRoutes from "./routes/auto-storage";
@@ -103,6 +104,7 @@ app.route("/api/admin", systemMonitorRoutes);
 app.route("/api/admin/markdown", adminMarkdownRoutes);
 app.route("/api/admin/topics", topicsManagementRoutes);
 app.route("/api/admin/keywords", keywordsManagementRoutes);
+app.route("/api/admin/tags", adminTagsRoutes);
 
 // ==================== 特殊路由 ====================
 // WebDAV (保持独立路径)
@@ -115,6 +117,11 @@ app.route("/api/auth", authRoutes);
 
 // 管理员路由 - 兼容旧客户端
 app.route("/admin", adminRoutes);
+app.route("/admin/markdown", adminMarkdownRoutes);
+app.route("/admin/tags", adminTagsRoutes);
+
+// 内容路由 - 兼容旧客户端
+app.route("/api/content", contentRoutes);
 
 // 测试端点
 app.get("/message", (c) => {
@@ -222,6 +229,7 @@ async function processRssFetch(sourceId: number, rssUrl: string, env: Cloudflare
         }
 
         // 使用统一LLM服务进行完整的内容分析
+        console.log(`[DEBUG] 检查ZHIPUAI_API_KEY: ${env.ZHIPUAI_API_KEY ? '已配置' : '未配置'}`);
         if (env.ZHIPUAI_API_KEY) {
           try {
             console.log(`开始为条目 ${rssEntry.id} 进行统一LLM分析`);
@@ -313,7 +321,58 @@ async function parseRssContent(rssContent: string): Promise<any[]> {
   }
 }
 
+// Cron定时任务处理函数
+async function scheduled(event: ScheduledEvent, env: CloudflareBindings, ctx: ExecutionContext): Promise<void> {
+  console.log(`[CRON] 定时任务触发: ${event.cron}`);
+
+  try {
+    const db = drizzle(env.DB);
+
+    // 获取所有需要抓取的RSS源
+    const allSources = await db.select().from(sources).all();
+    console.log(`[CRON] 找到 ${allSources.length} 个RSS源`);
+
+    let scheduledCount = 0;
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+
+    // 为每个源发送抓取任务到队列
+    for (const source of allSources) {
+      try {
+        // 检查是否需要抓取
+        // 1. 从未抓取过的源
+        // 2. 上次抓取时间超过1小时的源
+        // 3. 失败次数小于5次的源
+        const shouldFetch =
+          !source.lastFetchedAt ||
+          source.lastFetchedAt < oneHourAgo ||
+          (source.fetchFailureCount < 5);
+
+        if (shouldFetch) {
+          await env.RSS_FETCHER_QUEUE.send({
+            sourceId: source.id,
+            rssUrl: source.url,
+            scheduledAt: new Date().toISOString(),
+            manualTrigger: false
+          });
+
+          scheduledCount++;
+          console.log(`[CRON] 已调度RSS源 ${source.id} (${source.name})`);
+        } else {
+          console.log(`[CRON] 跳过RSS源 ${source.id} (${source.name}), 失败次数: ${source.fetchFailureCount}`);
+        }
+      } catch (error) {
+        console.error(`[CRON] 调度RSS源 ${source.id} 失败:`, error);
+      }
+    }
+
+    console.log(`[CRON] 定时任务完成，共调度 ${scheduledCount} 个RSS源抓取任务`);
+  } catch (error) {
+    console.error('[CRON] 定时任务执行失败:', error);
+  }
+}
+
 export default {
   fetch: app.fetch.bind(app),
-  queue: queue
+  queue: queue,
+  scheduled: scheduled
 };

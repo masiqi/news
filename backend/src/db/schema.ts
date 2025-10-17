@@ -1074,7 +1074,7 @@ export const r2AuditLogs = sqliteTable('r2_audit_logs', {
 export const enhancedContentAnalysis = sqliteTable('enhanced_content_analysis', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   userId: integer('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
-  contentId: integer('content_id').notNull().references(() => processedContent.id, { onDelete: 'cascade' }),
+  contentId: integer('content_id').notNull().references(() => processedContents.id, { onDelete: 'cascade' }),
   sourceId: text('source_id').notNull(),
   
   // 基础内容信息

@@ -1,10 +1,12 @@
 // src/routes/sources.ts
 import { Hono } from "hono";
+import { drizzle } from "drizzle-orm/d1";
 import { eq, and, or, desc } from "drizzle-orm";
 import { sources, rssEntries, processedContents } from "../db/schema";
 import { SourceService } from "../services/source.service";
 import { ContentCacheService } from "../services/content-cache.service";
 import { RssSchedulerService } from "../services/rss-scheduler.service";
+import { QueueProducerService } from "../services/queue/producer";
 import { requireAuth, getAuthUser } from "../middleware/auth";
 import type { Source, NewSource } from "../db/types";
 
@@ -12,9 +14,18 @@ const sourceRoutes = new Hono<{ Bindings: CloudflareBindings }>();
 
 // 初始化服务
 sourceRoutes.use('*', async (c, next) => {
+  const db = drizzle(c.env.DB);
   c.set('sourceService', new SourceService(c.env.DB));
   c.set('contentCacheService', new ContentCacheService(c.env.DB));
-  c.set('rssSchedulerService', new RssSchedulerService(c.env.DB, c.env.RSS_FETCHER_QUEUE));
+
+  // 为RssSchedulerService创建QueueProducerService
+  const queueProducer = new QueueProducerService(c.env.RSS_FETCHER_QUEUE, {
+    maxBatchSize: 10,
+    maxWaitTimeMs: 1000 * 10,
+    maxRetries: 3,
+    deadLetterQueue: 'RSS_FETCHER_DLQ'
+  });
+  c.set('rssSchedulerService', new RssSchedulerService(db, queueProducer, c.env.RSS_FETCHER_QUEUE));
   await next();
 });
 
@@ -87,7 +98,7 @@ sourceRoutes.post("/", requireAuth, async (c) => {
   try {
     const user = getAuthUser(c);
     if (!user) {
-      return c.json({ error: "用户未认证" }, 401);
+      return c.json({ success: false, error: "用户未认证" }, 401);
     }
 
     const body = await c.req.json();
@@ -95,7 +106,7 @@ sourceRoutes.post("/", requireAuth, async (c) => {
 
     // 验证输入
     if (!url || !name) {
-      return c.json({ error: "URL和名称是必填项" }, 400);
+      return c.json({ success: false, error: "URL和名称是必填项" }, 400);
     }
 
     const newSource: NewSource = {
@@ -109,10 +120,14 @@ sourceRoutes.post("/", requireAuth, async (c) => {
 
     const sourceService = c.get('sourceService') as SourceService;
     const source = await sourceService.createSource(newSource);
-    return c.json({ source }, 201);
+    return c.json({
+      success: true,
+      data: { source },
+      message: "RSS源添加成功"
+    }, 201);
   } catch (error) {
     console.error("创建RSS源错误:", error);
-    return c.json({ error: "服务器内部错误" }, 500);
+    return c.json({ success: false, error: "服务器内部错误" }, 500);
   }
 });
 
