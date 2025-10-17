@@ -19,14 +19,19 @@ export default function LoginPage() {
     try {
       const response = await api.login({ email, password });
 
-      if (response.success && response.token) {
+      // 后端返回 { message, token, user }
+      if (response.token) {
+        // 保存 token 到 localStorage
         localStorage.setItem('auth_token', response.token);
+        // 直接跳转到 dashboard
         router.push('/dashboard');
       } else {
-        setError(response.message || '登录失败');
+        setError('登录失败，请重试');
       }
-    } catch (err) {
-      setError('登录失败，请检查邮箱和密码');
+    } catch (err: any) {
+      // 显示后端返回的具体错误信息
+      const errorMessage = err?.message || '登录失败，请检查邮箱和密码';
+      setError(errorMessage);
       console.error('Login error:', err);
     } finally {
       setLoading(false);

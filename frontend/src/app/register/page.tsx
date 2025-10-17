@@ -40,11 +40,14 @@ export default function RegisterPage() {
     try {
       const response = await api.register({ email, password, username });
 
-      if (response.success && response.token) {
+      // 后端返回 { message, token, user }
+      if (response.token) {
+        // 保存 token 到 localStorage
         localStorage.setItem('auth_token', response.token);
+        // 直接跳转到 dashboard，不显示成功提示
         router.push('/dashboard');
       } else {
-        setError(response.message || '注册失败');
+        setError('注册失败，请重试');
       }
     } catch (err: any) {
       // 显示后端返回的具体错误信息
