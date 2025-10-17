@@ -27,16 +27,16 @@ export async function apiCall(endpoint: string, options: RequestInit = {}) {
 export const api = {
   // 认证
   register: (data: { email: string; password: string; username: string }) =>
-    apiCall('/api/auth/register', { method: 'POST', body: JSON.stringify(data) }),
-  
+    apiCall('/api/v1/auth/register', { method: 'POST', body: JSON.stringify(data) }),
+
   login: (data: { email: string; password: string }) =>
-    apiCall('/api/auth/login', { method: 'POST', body: JSON.stringify(data) }),
-  
+    apiCall('/api/v1/auth/login', { method: 'POST', body: JSON.stringify(data) }),
+
   // RSS源
-  getSources: () => apiCall('/api/sources'),
-  
-  getPublicSources: () => apiCall('/api/sources/public'),
-  
+  getSources: () => apiCall('/api/v1/sources'),
+
+  getPublicSources: () => apiCall('/api/v1/sources/public'),
+
   // 内容
-  getContent: () => apiCall('/api/content'),
+  getContent: () => apiCall('/api/v1/content'),
 };

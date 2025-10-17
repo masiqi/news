@@ -59,92 +59,62 @@ app.use(
   })
 );
 
-// 注册认证路由
-app.route("/auth", authRoutes);
+// ==================== API v1 路由 (用户API) ====================
+// 认证相关
+app.route("/api/v1/auth", authRoutes);
 
-// 注册RSS源路由
-app.route("/sources", sourceRoutes);
+// 内容相关
+app.route("/api/v1/content", contentRoutes);
+app.route("/api/v1/content", reprocessRoutes);
+app.route("/api/v1/sources", sourceRoutes);
+app.route("/api/v1/rss", rssRoutes);
 
-// 注册用户路由
-app.route("/users", userRoutes);
+// 标签和主题
+app.route("/api/v1/tags", tagsRoutes);
+app.route("/api/v1/topics", topicsRoutes);
+app.route("/api/v1/content-tags", contentTagsRoutes);
 
-// 注册系统路由
-app.route("/system", systemRoutes);
+// 用户功能
+app.route("/api/v1/users", userRoutes);
+app.route("/api/v1/user", userAccessRoutes);
+app.route("/api/v1/auto-storage", autoStorageRoutes);
+app.route("/api/v1/credentials", credentialRoutes);
 
-// 注册主题提取路由
-app.route("/topics", topicsRoutes);
+// 系统功能
+app.route("/api/v1/system", systemRoutes);
+app.route("/api/v1/monitoring", monitoringRoutes);
+app.route("/api/v1", statusRoutes);
 
-// 注册网页内容路由
-app.route("/web-content", webContentRoutes);
+// 其他功能
+app.route("/api/v1/web-content", webContentRoutes);
+app.route("/api/v1/ai", aiRoutes);
+app.route("/api/v1/edit-isolation", editIsolationRoutes);
+app.route("/api/v1/storage-optimization", optimizationRoutes);
+app.route("/api/v1/content-distribution", distributionRoutes);
 
-// 注册内容路由
-app.route("/api/content", contentRoutes);
+// LLM提取器
+app.route("/api/v1/llm-extractor", llmExtractorRoutes);
+app.route("/api/v1/llm-content-extractor", llmContentExtractorRoutes);
 
-// 注册AI重新处理路由
-app.route("/api/content", reprocessRoutes);
-
-// 注册标签聚合路由
-app.route("/api/tags", tagsRoutes);
-
-// 注册主题管理API路由
-app.route("/api/topics-management", topicsManagementRoutes);
-
-// 注册关键词管理API路由
-app.route("/api/keywords-management", keywordsManagementRoutes);
-
-// 注册内容标签API路由
-app.route("/api/content-tags", contentTagsRoutes);
-
-// 注册管理员API路由
-app.route("/admin", adminRoutes);
-
-// 注册管理员访问控制API路由
+// ==================== 管理员 API 路由 ====================
+app.route("/api/admin", adminRoutes);
 app.route("/api/admin", adminAccessRoutes);
-
-// 注册系统监控API路由
 app.route("/api/admin", systemMonitorRoutes);
+app.route("/api/admin/markdown", adminMarkdownRoutes);
+app.route("/api/admin/topics", topicsManagementRoutes);
+app.route("/api/admin/keywords", keywordsManagementRoutes);
 
-// 注册管理员Markdown管理路由
-app.route("/admin/markdown", adminMarkdownRoutes);
-
-// 注册用户访问控制API路由
-app.route("/api/user", userAccessRoutes);
-
-// 注册自动存储API路由
-app.route("/api", autoStorageRoutes);
-
-// 注册WebDAV路由
+// ==================== 特殊路由 ====================
+// WebDAV (保持独立路径)
 app.route("/webdav", webdavRoutes);
 
-// 注册用户编辑隔离管理API路由
-app.route("/api/edit-isolation", editIsolationRoutes);
+// ==================== 向后兼容的旧路由 (逐步废弃) ====================
+// 认证路由 - 兼容旧客户端
+app.route("/auth", authRoutes);
+app.route("/api/auth", authRoutes);
 
-// 注册存储优化管理API路由
-app.route("/api/storage-optimization", optimizationRoutes);
-
-// 注册内容分发管理API路由
-app.route("/api/content-distribution", distributionRoutes);
-
-// 注册RSS处理API路由
-app.route("/api/rss", rssRoutes);
-
-// 注册系统状态API路由
-app.route("/api", statusRoutes);
-
-// 注册监控API路由
-app.route("/api/monitoring", monitoringRoutes);
-
-// 注册AI处理API路由
-app.route("/api/ai", aiRoutes);
-
-// 暂时注释掉GLM路由
-// app.route("/api/glm", glmRoutes);
-
-// 移除测试路由注册
-
-// 注册LLM智能内容提取路由
-app.route("/llm-extractor", llmExtractorRoutes);
-app.route("/llm-content-extractor", llmContentExtractorRoutes);
+// 管理员路由 - 兼容旧客户端
+app.route("/admin", adminRoutes);
 
 // 测试端点
 app.get("/message", (c) => {
