@@ -1,10 +1,11 @@
 // src/services/unified-llm.service.ts
 import { drizzle } from 'drizzle-orm/d1';
-import { rssEntries, processedContents } from '../db/schema';
+import { rssEntries, processedContents, sources } from '../db/schema';
 import { eq } from 'drizzle-orm';
 import { CloudflareLLMService } from './cloudflare-llm.service';
 import { OpenRouterService } from './openrouter.service';
 import { CerebrasService } from './cerebras.service';
+import { AutoMarkdownStorageService } from './auto-markdown-storage.service';
 
 export interface LLMAnalysisResult {
   topics: string[];
@@ -402,14 +403,74 @@ ${isHtml ? `
 
   static async analyzeAndSave(params: LLMProcessingParams & { db: any, env?: any }): Promise<LLMAnalysisResult> {
     const { entryId, db, env, ...analysisParams } = params;
-    
+
     const result = await this.analyzeContent(analysisParams, env);
-    
+
     if (entryId) {
       await this.saveAnalysisResult(entryId, result, db);
       await this.updateEntryStatus(entryId, db);
+
+      // 自动存储 Markdown 文件到用户的 R2 空间
+      if (env) {
+        try {
+          // 获取条目的用户信息和源信息
+          const drizzleDb = drizzle(db);
+          const entry = await drizzleDb
+            .select()
+            .from(rssEntries)
+            .where(eq(rssEntries.id, entryId))
+            .get();
+
+          if (entry) {
+            const source = await drizzleDb
+              .select()
+              .from(sources)
+              .where(eq(sources.id, entry.sourceId))
+              .get();
+
+            if (source && source.userId) {
+              console.log(`[AUTO_STORAGE] 开始自动存储 Markdown 文件: 用户${source.userId}, 条目${entryId}`);
+
+              const storageService = new AutoMarkdownStorageService(env);
+              const storageResult = await storageService.processAndStoreMarkdown({
+                userId: source.userId,
+                sourceId: entry.sourceId,
+                entryId: entryId,
+                analysisResult: {
+                  title: analysisParams.title,
+                  topics: result.topics,
+                  keywords: result.keywords,
+                  sentiment: result.sentiment,
+                  analysis: result.analysis,
+                  educationalValue: result.educationalValue,
+                  extractedContent: result.extractedContent,
+                  images: result.images || []
+                },
+                originalContent: analysisParams.content,
+                metadata: {
+                  userId: source.userId,
+                  sourceId: entry.sourceId,
+                  entryId: entryId,
+                  title: analysisParams.title,
+                  sourceName: source.name,
+                  processedAt: new Date()
+                }
+              });
+
+              if (storageResult.success) {
+                console.log(`[AUTO_STORAGE] ✅ Markdown 文件已存储: ${storageResult.filePath}, 大小: ${storageResult.fileSize}字节`);
+              } else {
+                console.log(`[AUTO_STORAGE] ⚠️  Markdown 存储失败: ${storageResult.error}`);
+              }
+            }
+          }
+        } catch (storageError) {
+          console.error('[AUTO_STORAGE] 自动存储失败:', storageError);
+          // 不影响主流程，继续执行
+        }
+      }
     }
-    
+
     return result;
   }
 

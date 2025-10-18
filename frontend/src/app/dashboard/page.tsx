@@ -44,7 +44,7 @@ interface Pagination {
 
 export default function DashboardPage() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<'sources' | 'content'>('content');
+  const [activeTab, setActiveTab] = useState<'sources' | 'content' | 'webdav'>('content');
   const [sources, setSources] = useState<Source[]>([]);
   const [content, setContent] = useState<ContentItem[]>([]);
   const [pagination, setPagination] = useState<Pagination>({ page: 1, pageSize: 20, total: 0, totalPages: 0 });
@@ -230,6 +230,22 @@ export default function DashboardPage() {
               }}
             >
               RSS 源
+            </button>
+            <button
+              onClick={() => setActiveTab('webdav')}
+              style={{
+                padding: '12px 0',
+                border: 'none',
+                background: 'none',
+                fontSize: '16px',
+                fontWeight: '500',
+                cursor: 'pointer',
+                borderBottom: activeTab === 'webdav' ? '2px solid #0070f3' : '2px solid transparent',
+                color: activeTab === 'webdav' ? '#0070f3' : '#666',
+                marginBottom: '-2px'
+              }}
+            >
+              WebDAV 同步
             </button>
           </div>
         </div>
@@ -579,6 +595,118 @@ export default function DashboardPage() {
                 )}
               </>
             )}
+          </div>
+        )}
+
+        {activeTab === 'webdav' && (
+          <div>
+            <h2 style={{ fontSize: '24px', fontWeight: '700', marginBottom: '20px' }}>WebDAV 同步</h2>
+
+            <div className="card" style={{ marginBottom: '20px' }}>
+              <h3 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '16px' }}>📡 同步说明</h3>
+              <p style={{ color: '#666', lineHeight: '1.8', marginBottom: '16px' }}>
+                WebDAV 协议允许你将 AI 处理后的 Markdown 笔记同步到 Obsidian、Logseq 等本地笔记工具。
+                系统会自动为每个处理完成的内容生成 Markdown 文件并存储到你的个人 R2 空间。
+              </p>
+            </div>
+
+            <div className="card" style={{ marginBottom: '20px' }}>
+              <h3 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '16px' }}>🔗 连接信息</h3>
+
+              <div style={{ background: '#f5f5f5', padding: '16px', borderRadius: '8px', marginBottom: '16px' }}>
+                <div style={{ marginBottom: '12px' }}>
+                  <p style={{ fontSize: '13px', color: '#666', marginBottom: '4px' }}>WebDAV 地址</p>
+                  <code style={{
+                    display: 'block',
+                    background: '#fff',
+                    padding: '8px 12px',
+                    borderRadius: '4px',
+                    fontSize: '14px',
+                    fontFamily: 'monospace',
+                    wordBreak: 'break-all'
+                  }}>
+                    https://moxiang-distill-api.masiqi.workers.dev/webdav/news
+                  </code>
+                </div>
+
+                <div style={{ marginBottom: '12px' }}>
+                  <p style={{ fontSize: '13px', color: '#666', marginBottom: '4px' }}>用户名</p>
+                  <code style={{
+                    display: 'block',
+                    background: '#fff',
+                    padding: '8px 12px',
+                    borderRadius: '4px',
+                    fontSize: '14px',
+                    fontFamily: 'monospace'
+                  }}>
+                    你的注册邮箱
+                  </code>
+                </div>
+
+                <div>
+                  <p style={{ fontSize: '13px', color: '#666', marginBottom: '4px' }}>密码</p>
+                  <code style={{
+                    display: 'block',
+                    background: '#fff',
+                    padding: '8px 12px',
+                    borderRadius: '4px',
+                    fontSize: '14px',
+                    fontFamily: 'monospace'
+                  }}>
+                    你的登录密码
+                  </code>
+                </div>
+              </div>
+
+              <div style={{
+                background: '#fffbea',
+                border: '1px solid #f4d06f',
+                padding: '12px 16px',
+                borderRadius: '6px',
+                marginBottom: '16px'
+              }}>
+                <p style={{ fontSize: '14px', color: '#8a6116', margin: 0 }}>
+                  ⚠️ 提示：WebDAV 使用你的账号密码进行认证，请妥善保管凭据。
+                </p>
+              </div>
+
+              <div style={{ marginTop: '16px' }}>
+                <a
+                  href="https://moxiang-distill-api.masiqi.workers.dev/webdav/news"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn btn-primary"
+                  style={{ textDecoration: 'none', display: 'inline-block' }}
+                >
+                  📂 在浏览器中查看文件
+                </a>
+              </div>
+            </div>
+
+            <div className="card">
+              <h3 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '16px' }}>⚙️ Obsidian 配置示例</h3>
+
+              <ol style={{ color: '#666', lineHeight: '2', paddingLeft: '20px' }}>
+                <li>打开 Obsidian 设置</li>
+                <li>找到"第三方插件"并启用"Remotely Save"插件</li>
+                <li>在插件设置中选择 WebDAV 作为远程服务</li>
+                <li>填入上述 WebDAV 地址、用户名和密码</li>
+                <li>点击"测试连接"确认配置正确</li>
+                <li>设置自动同步间隔，开始自动同步</li>
+              </ol>
+
+              <div style={{
+                marginTop: '16px',
+                padding: '12px',
+                background: '#f0f9ff',
+                border: '1px solid #bae6fd',
+                borderRadius: '6px'
+              }}>
+                <p style={{ fontSize: '13px', color: '#0c4a6e', margin: 0 }}>
+                  💡 提示：推荐安装"Remotely Save"或"Git"插件进行双向同步。WebDAV 支持查看和下载文件。
+                </p>
+              </div>
+            </div>
           </div>
         )}
 
